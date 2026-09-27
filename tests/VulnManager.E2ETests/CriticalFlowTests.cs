@@ -97,9 +97,11 @@ public sealed partial class CriticalFlowTests : IAsyncLifetime
         var projectLink = page.Locator("table a[href^='/projects/']", new() { HasText = "portal-ciudadano-demo" });
         await ((await projectLink.CountAsync()) > 0 ? projectLink.First : page.Locator("table a[href^='/projects/']").First).ClickAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Tab, new() { Name = "VEX" }).Or(page.GetByRole(AriaRole.Button, new() { Name = "VEX", Exact = true }))).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("table tbody tr a[href^='/findings/']").First).ToBeVisibleAsync(new() { Timeout = 15_000 });
         await CaptureAsync(page, "04-proyecto");
 
         await ClickUntilVisibleAsync(page.GetByRole(AriaRole.Button, new() { Name = "VEX", Exact = true }), page.GetByRole(AriaRole.Heading, new() { Name = "Declaraciones VEX" }));
+        await Assertions.Expect(page.Locator("table tbody tr", new() { HasText = "CVE-2021-45046" }).First).ToBeVisibleAsync(new() { Timeout = 15_000 });
         await CaptureAsync(page, "05-vex", fullPage: true);
 
         foreach (var (path, heading, name) in new[]
