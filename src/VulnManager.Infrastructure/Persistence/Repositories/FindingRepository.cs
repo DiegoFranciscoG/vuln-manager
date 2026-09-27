@@ -132,7 +132,7 @@ public sealed class FindingRepository(VulnManagerDbContext db) : IFindingReposit
         from m in matches.DefaultIfEmpty()
         join k in db.KevEntries on v.CveId equals k.CveId into kevs
         from k in kevs.DefaultIfEmpty()
-        select new FindingRow(f, p.Name, c, v, m, k);
+        select new FindingRow { Finding = f, ProjectName = p.Name, Component = c, Vulnerability = v, Match = m, Kev = k };
 
     private IQueryable<FindingRow> Filter(FindingQuery query, DateTimeOffset now)
     {
@@ -210,8 +210,21 @@ public sealed class FindingRepository(VulnManagerDbContext db) : IFindingReposit
             .ThenBy(r => r.Finding.FirstDetectedAt),
     };
 
-    private sealed record FindingRow(Finding Finding, string ProjectName, Component Component, Vulnerability Vulnerability, ComponentVulnerability? Match, KevEntry? Kev)
+    /// <summary>Row of the joined query. An object initializer (not a constructor) lets EF Core compose filters and sorting on it.</summary>
+    private sealed class FindingRow
     {
+        public required Finding Finding { get; init; }
+
+        public required string ProjectName { get; init; }
+
+        public required Component Component { get; init; }
+
+        public required Vulnerability Vulnerability { get; init; }
+
+        public ComponentVulnerability? Match { get; init; }
+
+        public KevEntry? Kev { get; init; }
+
         public FindingListItemDto ToDto(DateTimeOffset now)
         {
             var open = Finding.Status == FindingStatus.New;

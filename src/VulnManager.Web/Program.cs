@@ -35,11 +35,6 @@ builder.Services
 
 builder.Services.Configure<SyncTriggerOptions>(builder.Configuration.GetSection(SyncTriggerOptions.Section));
 builder.Services.AddDataProtection().PersistKeysToDbContext<VulnManagerDbContext>().SetApplicationName("vuln-manager");
-builder.Services.AddAntiforgery(options =>
-{
-    options.Cookie.Name = "__Host-vm-af";
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-});
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -90,7 +85,10 @@ if (!app.Environment.IsDevelopment())
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseSerilogRequestLogging();
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+// Friendly status pages only for the UI; API clients get the raw status code (401/403/404/429).
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase),
+    ui => ui.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
 app.UseSwaggerUI(options =>
 {

@@ -79,15 +79,18 @@ public static class SecurityServiceCollectionExtensions
             };
         });
 
+        // Production (HTTPS behind Render's proxy): Secure cookies with the __Host- prefix. Local HTTP runs set
+        // Security:SecureCookies=false because browsers drop Secure cookies on plain HTTP.
+        var secureCookies = configuration.GetValue("Security:SecureCookies", true);
         services.ConfigureApplicationCookie(options =>
         {
             options.LoginPath = "/login";
             options.LogoutPath = "/logout";
             options.AccessDeniedPath = "/forbidden";
-            options.Cookie.Name = "__Host-vm-auth";
+            options.Cookie.Name = secureCookies ? "__Host-vm-auth" : "vm-auth";
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = SameSiteMode.Lax;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;
         });
@@ -147,6 +150,12 @@ public static class SecurityServiceCollectionExtensions
                 policy.WithOrigins(origins).WithMethods("GET", "POST", "PUT", "DELETE").WithHeaders("Authorization", "Content-Type", ApiKeyDefaults.HeaderName);
             }
         }));
+
+        services.AddAntiforgery(options =>
+        {
+            options.Cookie.Name = secureCookies ? "__Host-vm-af" : "vm-af";
+            options.Cookie.SecurePolicy = secureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+        });
 
         if (!environment.IsDevelopment())
         {

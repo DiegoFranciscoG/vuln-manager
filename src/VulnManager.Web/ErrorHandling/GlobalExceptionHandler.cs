@@ -9,12 +9,15 @@ namespace VulnManager.Web.ErrorHandling;
 /// Maps application exceptions to RFC 9457 problem details for /api requests. Clients never receive stack traces or
 /// internal messages for unexpected errors (OWASP A10:2025); those are logged with the trace id.
 /// </summary>
-public sealed partial class GlobalExceptionHandler(IProblemDetailsService problemDetails, ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
+public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
-        if (!httpContext.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+
+        // The middleware rewrites Request.Path to the error page before calling handlers; use the original path.
+        var path = httpContext.Features.Get<IExceptionHandlerPathFeature>()?.Path ?? httpContext.Request.Path.Value ?? string.Empty;
+        if (!path.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -35,20 +38,21 @@ public sealed partial class GlobalExceptionHandler(IProblemDetailsService proble
             LogUnhandled(logger, exception, httpContext.TraceIdentifier);
         }
 
+        // Written directly (not through IProblemDetailsService) so the response never depends on the Accept header.
         httpContext.Response.StatusCode = status;
-        return await problemDetails.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = httpContext,
-            Exception = exception,
-            ProblemDetails = new ProblemDetails
+        await httpContext.Response.WriteAsJsonAsync(
+            new ProblemDetails
             {
                 Status = status,
                 Title = title,
                 Detail = detail,
-                Instance = httpContext.Request.Path,
+                Instance = path,
                 Extensions = { ["traceId"] = httpContext.TraceIdentifier },
             },
-        });
+            options: null,
+            contentType: "application/problem+json",
+            cancellationToken);
+        return true;
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception (traceId {TraceId})")]
