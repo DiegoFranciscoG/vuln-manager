@@ -1,0 +1,3 @@
+[*.cs]
+# Test names describe behaviour with underscores (Method_condition_result).
+dotnet_diagnostic.CA1707.severity = none

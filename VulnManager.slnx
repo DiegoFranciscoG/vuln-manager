@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VulnManager.Application/VulnManager.Application.csproj" />
+    <Project Path="src/VulnManager.Domain/VulnManager.Domain.csproj" />
+    <Project Path="src/VulnManager.Infrastructure/VulnManager.Infrastructure.csproj" />
+    <Project Path="src/VulnManager.Web/VulnManager.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VulnManager.IntegrationTests/VulnManager.IntegrationTests.csproj" />
+    <Project Path="tests/VulnManager.UnitTests/VulnManager.UnitTests.csproj" />
+  </Folder>
+</Solution>
