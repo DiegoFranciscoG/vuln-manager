@@ -6,6 +6,7 @@
     <Project Path="src/VulnManager.Web/VulnManager.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/VulnManager.E2ETests/VulnManager.E2ETests.csproj" />
     <Project Path="tests/VulnManager.IntegrationTests/VulnManager.IntegrationTests.csproj" />
     <Project Path="tests/VulnManager.UnitTests/VulnManager.UnitTests.csproj" />
   </Folder>
