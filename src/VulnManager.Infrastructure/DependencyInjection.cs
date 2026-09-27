@@ -32,6 +32,8 @@ public static class DependencyInjection
             throw new InvalidOperationException("Define ConnectionStrings__Default (environment variable). There is no default value on purpose.");
         }
 
+        connectionString = PostgresConnectionString.Normalize(connectionString);
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddDbContext<VulnManagerDbContext>(options => options
             .UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3))

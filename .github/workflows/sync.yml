@@ -1,0 +1,30 @@
+name: Sincronización programada
+
+# Render free duerme el servicio tras 15 minutos sin tráfico; este cron lo despierta y dispara la sincronización.
+# GitHub desactiva los cron de repos públicos tras 60 días sin actividad.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  trigger:
+    name: Despertar y sincronizar
+    runs-on: ubuntu-24.04
+    steps:
+      - name: POST /api/sync/trigger
+        env:
+          APP_URL: ${{ vars.VULNMANAGER_URL }}
+          SYNC_TOKEN: ${{ secrets.SYNC_TRIGGER_TOKEN }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$SYNC_TOKEN" ]; then
+            echo "::notice::Configura la variable VULNMANAGER_URL y el secreto SYNC_TRIGGER_TOKEN para activar la sincronización."
+            exit 0
+          fi
+          for attempt in 1 2 3 4 5 6; do
+            curl -fsS --max-time 60 "$APP_URL/health/live" && break
+            sleep 20
+          done
+          curl -fsS --max-time 60 -X POST -H "X-Sync-Token: $SYNC_TOKEN" "$APP_URL/api/sync/trigger"

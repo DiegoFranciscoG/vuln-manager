@@ -1,9 +1,50 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-@Body
+<div class="shell">
+    <header class="topbar">
+        <a class="brand" href="/">
+            <img src="favicon.svg" alt="" width="24" height="24" />
+            <span>vuln-manager</span>
+        </a>
+        <AuthorizeView>
+            <Authorized>
+                <nav class="nav" aria-label="Principal">
+                    <NavLink href="/" Match="NavLinkMatch.All">Tablero</NavLink>
+                    <NavLink href="/findings">Hallazgos</NavLink>
+                    <NavLink href="/alerts">Alertas</NavLink>
+                    <NavLink href="/sync">Sincronización</NavLink>
+                    <NavLink href="/rules">Reglas</NavLink>
+                    <AuthorizeView Roles="@AppRoles.Admin" Context="admin">
+                        <NavLink href="/audit">Auditoría</NavLink>
+                    </AuthorizeView>
+                    <NavLink href="/sources">Fuentes</NavLink>
+                </nav>
+                <form class="logout" method="post" action="/logout" data-enhance="false">
+                    <AntiforgeryToken />
+                    <span class="muted role">@RoleOf(context.User)</span>
+                    <button type="submit" class="btn btn-ghost">Salir</button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+
+    <footer class="footer">
+        <span>Datos: OSV.dev (GitHub Advisory Database, CC-BY 4.0), CISA KEV y Vulnrichment, FIRST EPSS, CVE® (MITRE) y NVD.</span>
+        <span>This product uses data from the NVD API but is not endorsed or certified by the NVD.</span>
+    </footer>
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    Ocurrió un error inesperado.
+    <a href="." class="reload">Recargar</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private static string RoleOf(System.Security.Claims.ClaimsPrincipal user) =>
+        AppRoles.All.FirstOrDefault(user.IsInRole) ?? string.Empty;
+}

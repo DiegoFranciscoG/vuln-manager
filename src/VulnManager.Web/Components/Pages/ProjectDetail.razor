@@ -1,0 +1,364 @@
+@page "/projects/{Id:guid}"
+@inherits AppComponentBase
+
+<PageTitle>@(project?.Name ?? "Proyecto") · vuln-manager</PageTitle>
+
+@if (project is null)
+{
+    <Messages Error="@ErrorMessage" />
+    <p class="muted">Cargando…</p>
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>@project.Name</h1>
+            <p class="muted">
+                @(project.Description ?? "Sin descripción")
+                · <span class="badge @(project.Exposure == Exposure.Public ? "exposure-public" : "exposure-internal")">@Labels.Of(project.Exposure)</span>
+                · @Labels.Of(project.Environment)
+                @if (project.RepositoryUrl is not null)
+                {
+                    <span> · <a href="@project.RepositoryUrl" target="_blank" rel="noopener noreferrer">Repositorio</a></span>
+                }
+            </p>
+        </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+        <button class="tab @(tab == "findings" ? "active" : "")" @onclick='() => tab = "findings"'>Hallazgos</button>
+        <button class="tab @(tab == "sboms" ? "active" : "")" @onclick="ShowSbomsAsync">SBOM</button>
+        <button class="tab @(tab == "vex" ? "active" : "")" @onclick="ShowVexAsync">VEX</button>
+        <AuthorizeView Roles="@AppRoles.Admin">
+            <button class="tab @(tab == "keys" ? "active" : "")" @onclick="ShowKeysAsync">Claves de ingesta</button>
+            <button class="tab @(tab == "settings" ? "active" : "")" @onclick="ShowSettings">Configuración</button>
+        </AuthorizeView>
+    </div>
+
+    <Messages Error="@ErrorMessage" Success="@SuccessMessage" />
+
+    @switch (tab)
+    {
+        case "findings":
+            <section class="card">
+                <FindingsGrid ProjectId="Id" InitialStatus="NEW" />
+            </section>
+            break;
+
+        case "sboms":
+            <section class="card">
+                <h2>Cargar SBOM CycloneDX (JSON 1.4–1.7, máx. 10 MiB)</h2>
+                <AuthorizeView Policy="@AppPolicies.CanTriage" Context="uploadAuth">
+                    <Authorized>
+                        <div class="upload">
+                            <InputFile OnChange="UploadAsync" accept=".json,application/json,application/vnd.cyclonedx+json" disabled="@Busy" />
+                            @if (Busy)
+                            {
+                                <span class="muted">Procesando…</span>
+                            }
+                        </div>
+                        <p class="muted small">
+                            Desde CI usa <code>POST /api/projects/@Id/sboms</code> con la cabecera <code>X-Api-Key</code>. Subir el mismo archivo dos veces no duplica nada.
+                        </p>
+                    </Authorized>
+                    <NotAuthorized>
+                        <p class="muted">Tu rol es de solo lectura.</p>
+                    </NotAuthorized>
+                </AuthorizeView>
+                @if (lastImport is not null)
+                {
+                    <div class="alert alert-info">
+                        @(lastImport.Created ? "SBOM importado" : "Este SBOM ya estaba importado (idempotente)"):
+                        @lastImport.Import.ComponentCount componentes, @lastImport.Import.SkippedCount omitidos (sin PURL/versión),
+                        @lastImport.VexStatementsImported declaraciones VEX.
+                        @if (lastImport.EnrichmentQueued)
+                        {
+                            <span> El cruce con OSV corre en segundo plano; los hallazgos aparecen en unos segundos.</span>
+                        }
+                    </div>
+                }
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr><th>Fecha</th><th>Archivo</th><th>Origen</th><th>CycloneDX</th><th class="num">Componentes</th><th class="num">Omitidos</th><th>SHA-256</th><th>Estado</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in sboms)
+                            {
+                                <tr>
+                                    <td>@Date(s.ImportedAt) @(s.Id == project.CurrentSbomImportId ? "(vigente)" : "")</td>
+                                    <td>@(s.FileName ?? "—")</td>
+                                    <td>@s.Source @(s.SourceRef is null ? "" : $"· {s.SourceRef}")</td>
+                                    <td>@s.SpecVersion</td>
+                                    <td class="num">@s.ComponentCount</td>
+                                    <td class="num">@s.SkippedCount</td>
+                                    <td><code class="small" title="@s.Sha256">@s.Sha256[..12]…</code></td>
+                                    <td>@s.Status</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            break;
+
+        case "vex":
+            <section class="card">
+                <h2>Declaraciones VEX</h2>
+                <p class="muted">Una declaración <em>not_affected</em> con justificación cierra el hallazgo como «No afectado» y sigue vigente en futuros SBOM. Requisitos mínimos de CISA: justificación o declaración de impacto.</p>
+                <AuthorizeView Policy="@AppPolicies.CanTriage" Context="vexAuth">
+                    <EditForm Model="vexForm" OnValidSubmit="CreateVexAsync" FormName="vex" class="form-grid">
+                        <DataAnnotationsValidator />
+                        <label>Vulnerabilidad (CVE o GHSA)<InputText @bind-Value="vexForm.VulnerabilityRef" placeholder="CVE-2021-45046" /></label>
+                        <label>Componente (PURL, opcional)<InputText @bind-Value="vexForm.ComponentPurl" placeholder="pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1" /></label>
+                        <label>
+                            Estado
+                            <InputSelect @bind-Value="vexForm.Status">
+                                @foreach (var s in Enum.GetValues<VexStatus>())
+                                {
+                                    <option value="@s">@Labels.Of(s)</option>
+                                }
+                            </InputSelect>
+                        </label>
+                        <label>
+                            Justificación (CISA)
+                            <InputSelect @bind-Value="vexForm.Justification">
+                                <option value="">—</option>
+                                @foreach (var j in VexJustifications.Cisa)
+                                {
+                                    <option value="@j">@j</option>
+                                }
+                            </InputSelect>
+                        </label>
+                        <label class="span-2">Declaración de impacto<InputTextArea @bind-Value="vexForm.ImpactStatement" rows="2" /></label>
+                        <label class="span-2">Declaración de acción (obligatoria si «Afectado»)<InputTextArea @bind-Value="vexForm.ActionStatement" rows="2" /></label>
+                        <ValidationSummary />
+                        <div><button type="submit" class="btn btn-primary" disabled="@Busy">Registrar VEX</button></div>
+                    </EditForm>
+                </AuthorizeView>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead><tr><th>Fecha</th><th>Vulnerabilidad</th><th>Componente</th><th>Estado</th><th>Justificación / detalle</th><th>Origen</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var v in vexStatements)
+                            {
+                                <tr class="@(v.RevokedAt is null ? "" : "revoked")">
+                                    <td>@Day(v.CreatedAt)</td>
+                                    <td>@v.VulnerabilityRef</td>
+                                    <td><code class="small">@(v.ComponentPurl ?? "todo el proyecto")</code></td>
+                                    <td>@Labels.Of(v.Status)</td>
+                                    <td>@(v.Justification ?? "") <div class="muted small">@(v.ImpactStatement ?? v.ActionStatement)</div></td>
+                                    <td>@v.Source</td>
+                                    <td>
+                                        @if (v.RevokedAt is null)
+                                        {
+                                            <AuthorizeView Policy="@AppPolicies.CanTriage" Context="auth">
+                                                <button class="btn btn-ghost small" @onclick="() => RevokeVexAsync(v.Id)">Revocar</button>
+                                            </AuthorizeView>
+                                        }
+                                        else
+                                        {
+                                            <span class="muted small">revocada</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            break;
+
+        case "keys":
+            <section class="card">
+                <h2>Claves de ingesta (CI/CD)</h2>
+                <p class="muted">Cada clave solo puede cargar SBOM/VEX y leer este proyecto. El secreto se muestra una única vez; se guarda solo su hash SHA-256.</p>
+                <EditForm Model="keyForm" OnValidSubmit="CreateKeyAsync" FormName="key" class="form-inline">
+                    <DataAnnotationsValidator />
+                    <label>Nombre<InputText @bind-Value="keyForm.Name" placeholder="pipeline-devsecops" /></label>
+                    <label>Expira en (días)<InputNumber @bind-Value="keyForm.ExpiresInDays" min="1" max="365" /></label>
+                    <button type="submit" class="btn btn-primary" disabled="@Busy">Crear clave</button>
+                    <ValidationSummary />
+                </EditForm>
+                @if (newSecret is not null)
+                {
+                    <div class="alert alert-warning">
+                        Copia esta clave ahora; no se volverá a mostrar:
+                        <code class="secret">@newSecret</code>
+                    </div>
+                }
+                <table class="table">
+                    <thead><tr><th>Nombre</th><th>Prefijo</th><th>Creada</th><th>Expira</th><th>Último uso</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var k in keys)
+                        {
+                            <tr class="@(k.RevokedAt is null ? "" : "revoked")">
+                                <td>@k.Name</td>
+                                <td><code>vmk_@k.Prefix</code></td>
+                                <td>@Day(k.CreatedAt)</td>
+                                <td>@Day(k.ExpiresAt)</td>
+                                <td>@Date(k.LastUsedAt)</td>
+                                <td>
+                                    @if (k.RevokedAt is null)
+                                    {
+                                        <button class="btn btn-ghost small" @onclick="() => RevokeKeyAsync(k.Id)">Revocar</button>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted small">revocada</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+            break;
+
+        case "settings":
+            <section class="card">
+                <h2>Configuración</h2>
+                <p class="muted">La exposición define la columna «Publicly exposed» de la BOD 26-04: cambiarla recalcula prioridades y plazos.</p>
+                <ProjectForm Model="settingsForm" OnSubmit="SaveSettingsAsync" SubmitText="Guardar" Busy="Busy" />
+            </section>
+            break;
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ProjectDto? project;
+    private string tab = "findings";
+    private IReadOnlyList<SbomImportDto> sboms = [];
+    private IReadOnlyList<VexStatementDto> vexStatements = [];
+    private IReadOnlyList<ApiKeyDto> keys = [];
+    private SbomImportResultDto? lastImport;
+    private string? newSecret;
+    private CreateVexStatementRequest vexForm = new();
+    private CreateApiKeyRequest keyForm = new() { Name = "pipeline-devsecops" };
+    private ProjectRequest settingsForm = new();
+
+    protected override async Task OnParametersSetAsync() => await LoadProjectAsync();
+
+    private async Task LoadProjectAsync()
+    {
+        var actor = await ActorAsync();
+        await TryAsync(async () => project = await Ui.RunAsync<ProjectService, ProjectDto>(s => s.GetAsync(actor, Id)));
+    }
+
+    private async Task ShowSbomsAsync()
+    {
+        tab = "sboms";
+        var actor = await ActorAsync();
+        await TryAsync(async () => sboms = await Ui.RunAsync<SbomImportService, IReadOnlyList<SbomImportDto>>(s => s.ListAsync(actor, Id, 20)));
+    }
+
+    private async Task ShowVexAsync()
+    {
+        tab = "vex";
+        var actor = await ActorAsync();
+        await TryAsync(async () => vexStatements = await Ui.RunAsync<VexService, IReadOnlyList<VexStatementDto>>(s => s.ListAsync(actor, Id, includeRevoked: true)));
+    }
+
+    private async Task ShowKeysAsync()
+    {
+        tab = "keys";
+        newSecret = null;
+        var actor = await ActorAsync();
+        await TryAsync(async () => keys = await Ui.RunAsync<ApiKeyService, IReadOnlyList<ApiKeyDto>>(s => s.ListAsync(actor, Id)));
+    }
+
+    private void ShowSettings()
+    {
+        tab = "settings";
+        settingsForm = new ProjectRequest
+        {
+            Name = project!.Name,
+            Description = project.Description,
+            RepositoryUrl = project.RepositoryUrl,
+            Exposure = project.Exposure,
+            Environment = project.Environment,
+            AssetType = project.AssetType,
+        };
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.Size > SbomImport.MaxSizeBytes)
+        {
+            ErrorMessage = "El archivo supera 10 MiB.";
+            return;
+        }
+
+        if (!file.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            ErrorMessage = "Solo se aceptan archivos .json (CycloneDX JSON).";
+            return;
+        }
+
+        var actor = await ActorAsync();
+        await TryAsync(async () =>
+        {
+            await using var stream = file.OpenReadStream(SbomImport.MaxSizeBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var content = memory.ToArray();
+            lastImport = await Ui.RunAsync<SbomImportService, SbomImportResultDto>(s => s.ImportAsync(actor, Id, content, file.Name, SbomSource.Upload, null));
+            sboms = await Ui.RunAsync<SbomImportService, IReadOnlyList<SbomImportDto>>(s => s.ListAsync(actor, Id, 20));
+            project = await Ui.RunAsync<ProjectService, ProjectDto>(s => s.GetAsync(actor, Id));
+        });
+    }
+
+    private async Task CreateVexAsync()
+    {
+        var actor = await ActorAsync();
+        var request = vexForm;
+        if (string.IsNullOrWhiteSpace(request.Justification))
+        {
+            request.Justification = null;
+        }
+
+        if (await TryAsync(async () => await Ui.RunAsync<VexService, VexStatementDto>(s => s.CreateAsync(actor, Id, request)), "Declaración VEX registrada; los hallazgos se recalcularon."))
+        {
+            vexForm = new CreateVexStatementRequest();
+            await ShowVexAsync();
+        }
+    }
+
+    private async Task RevokeVexAsync(Guid statementId)
+    {
+        var actor = await ActorAsync();
+        if (await TryAsync(() => Ui.RunAsync<VexService>(s => s.RevokeAsync(actor, Id, statementId)), "Declaración revocada; los hallazgos se reabrieron si correspondía."))
+        {
+            await ShowVexAsync();
+        }
+    }
+
+    private async Task CreateKeyAsync()
+    {
+        var actor = await ActorAsync();
+        ApiKeyCreatedDto? created = null;
+        if (await TryAsync(async () => created = await Ui.RunAsync<ApiKeyService, ApiKeyCreatedDto>(s => s.CreateAsync(actor, Id, keyForm))))
+        {
+            await ShowKeysAsync();
+            newSecret = created!.Secret;
+        }
+    }
+
+    private async Task RevokeKeyAsync(Guid keyId)
+    {
+        var actor = await ActorAsync();
+        if (await TryAsync(() => Ui.RunAsync<ApiKeyService>(s => s.RevokeAsync(actor, Id, keyId)), "Clave revocada."))
+        {
+            await ShowKeysAsync();
+        }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        var actor = await ActorAsync();
+        await TryAsync(async () => project = await Ui.RunAsync<ProjectService, ProjectDto>(s => s.UpdateAsync(actor, Id, settingsForm)), "Proyecto actualizado.");
+    }
+}

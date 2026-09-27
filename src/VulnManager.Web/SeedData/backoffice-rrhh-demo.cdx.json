@@ -1,0 +1,82 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:5d3b9e4c-7f6a-4b8c-8d1e-2f3a4b5c6d7e",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-09-26T12:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "cyclonedx-demo-generator",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "app",
+      "name": "backoffice-rrhh-demo",
+      "version": "1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "express@4.17.1",
+      "name": "express",
+      "version": "4.17.1",
+      "purl": "pkg:npm/express@4.17.1",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "jsonwebtoken@8.5.1",
+      "name": "jsonwebtoken",
+      "version": "8.5.1",
+      "purl": "pkg:npm/jsonwebtoken@8.5.1",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "moment@2.29.1",
+      "name": "moment",
+      "version": "2.29.1",
+      "purl": "pkg:npm/moment@2.29.1",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "node-fetch@2.6.0",
+      "name": "node-fetch",
+      "version": "2.6.0",
+      "purl": "pkg:npm/node-fetch@2.6.0",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "requests@2.25.1",
+      "name": "requests",
+      "version": "2.25.1",
+      "purl": "pkg:pypi/requests@2.25.1",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pyyaml@5.3.1",
+      "name": "pyyaml",
+      "version": "5.3.1",
+      "purl": "pkg:pypi/pyyaml@5.3.1",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "jinja2@2.11.2",
+      "name": "jinja2",
+      "version": "2.11.2",
+      "purl": "pkg:pypi/jinja2@2.11.2",
+      "scope": "required"
+    }
+  ]
+}

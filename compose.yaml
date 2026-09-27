@@ -1,0 +1,57 @@
+# Local stack: docker compose up --build   (copy .env.example to .env and fill it first)
+# Secrets have no defaults: compose refuses to start if a required one is missing.
+name: vuln-manager
+
+services:
+  db:
+    image: postgres:17.11-alpine3.24
+    environment:
+      POSTGRES_DB: vulnmanager
+      POSTGRES_USER: vulnmanager
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vulnmanager -d vulnmanager"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    image: vuln-manager:local
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=vulnmanager;Username=vulnmanager;Password=${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}"
+      Jwt__Secret: ${JWT_SECRET:?Define JWT_SECRET en .env (32 bytes aleatorios o más)}
+      Database__ApplyMigrationsOnStartup: "true"
+      Seed__DemoData: "true"
+      Seed__AdminEmail: ${SEED_ADMIN_EMAIL:?Define SEED_ADMIN_EMAIL en .env}
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:?Define SEED_ADMIN_PASSWORD en .env}
+      Seed__AnalystEmail: ${SEED_ANALYST_EMAIL:-}
+      Seed__AnalystPassword: ${SEED_ANALYST_PASSWORD:-}
+      Seed__ViewerEmail: ${SEED_VIEWER_EMAIL:-}
+      Seed__ViewerPassword: ${SEED_VIEWER_PASSWORD:-}
+      Sync__TriggerToken: ${SYNC_TRIGGER_TOKEN:-}
+      ExternalSources__NvdApiKey: ${NVD_API_KEY:-}
+      AlertWebhook__Url: ${ALERT_WEBHOOK_URL:-}
+      Cors__AllowedOrigins: ${CORS_ALLOWED_ORIGINS:-}
+      # Local plain HTTP: browsers drop Secure cookies, so they are relaxed only here.
+      Security__SecureCookies: "false"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+volumes:
+  db-data:

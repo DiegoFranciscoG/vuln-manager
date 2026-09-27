@@ -1,0 +1,52 @@
+@implements IDisposable
+
+@* Spanish pager for QuickGrid: the built-in Paginator only ships English text. *@
+@if (State.TotalItemCount is int total)
+{
+    <nav class="paginator" aria-label="Paginación">
+        <span><strong>@total</strong> @(total == 1 ? "resultado" : "resultados")</span>
+        <button type="button" disabled="@(!CanGoBack)" title="Primera página" aria-label="Primera página" @onclick="() => GoToAsync(0)">«</button>
+        <button type="button" disabled="@(!CanGoBack)" title="Página anterior" aria-label="Página anterior" @onclick="() => GoToAsync(State.CurrentPageIndex - 1)">‹</button>
+        <span>Página <strong>@(State.CurrentPageIndex + 1)</strong> de <strong>@PageCount</strong></span>
+        <button type="button" disabled="@(!CanGoForward)" title="Página siguiente" aria-label="Página siguiente" @onclick="() => GoToAsync(State.CurrentPageIndex + 1)">›</button>
+        <button type="button" disabled="@(!CanGoForward)" title="Última página" aria-label="Última página" @onclick="() => GoToAsync(State.LastPageIndex ?? 0)">»</button>
+    </nav>
+}
+
+@code {
+    private PaginationState? subscribed;
+
+    [Parameter, EditorRequired]
+    public PaginationState State { get; set; } = default!;
+
+    private int PageCount => (State.LastPageIndex ?? 0) + 1;
+
+    private bool CanGoBack => State.CurrentPageIndex > 0;
+
+    private bool CanGoForward => State.CurrentPageIndex < (State.LastPageIndex ?? 0);
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(subscribed, State))
+        {
+            Unsubscribe();
+            State.TotalItemCountChanged += OnTotalItemCountChanged;
+            subscribed = State;
+        }
+    }
+
+    public void Dispose() => Unsubscribe();
+
+    private Task GoToAsync(int pageIndex) => State.SetCurrentPageIndexAsync(pageIndex);
+
+    private void OnTotalItemCountChanged(object? sender, int? count) => _ = InvokeAsync(StateHasChanged);
+
+    private void Unsubscribe()
+    {
+        if (subscribed is not null)
+        {
+            subscribed.TotalItemCountChanged -= OnTotalItemCountChanged;
+            subscribed = null;
+        }
+    }
+}

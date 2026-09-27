@@ -1,0 +1,33 @@
+@page "/projects/new"
+@attribute [Authorize(Roles = AppRoles.Admin)]
+@inherits AppComponentBase
+@inject NavigationManager Navigation
+
+<PageTitle>Nuevo proyecto · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Nuevo proyecto</h1>
+        <p class="muted">Un proyecto es un producto o servicio con su propio SBOM. Luego crea una clave de ingesta para su pipeline.</p>
+    </div>
+</div>
+
+<Messages Error="@ErrorMessage" />
+
+<section class="card">
+    <ProjectForm Model="form" OnSubmit="CreateAsync" SubmitText="Crear proyecto" Busy="Busy" />
+</section>
+
+@code {
+    private readonly ProjectRequest form = new();
+
+    private async Task CreateAsync()
+    {
+        var actor = await ActorAsync();
+        ProjectDto? created = null;
+        if (await TryAsync(async () => created = await Ui.RunAsync<ProjectService, ProjectDto>(s => s.CreateAsync(actor, form))))
+        {
+            Navigation.NavigateTo($"/projects/{created!.Id}");
+        }
+    }
+}

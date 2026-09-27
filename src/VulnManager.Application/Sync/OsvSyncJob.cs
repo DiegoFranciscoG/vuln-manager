@@ -87,13 +87,12 @@ public sealed class OsvSyncJob(
         {
             var purl = PackageUrl.Parse(component.Purl);
             var current = new HashSet<Guid>();
-            foreach (var reference in refsByComponent[component.Id])
+            var records = refsByComponent[component.Id]
+                .Select(r => details.GetValueOrDefault(r.Id))
+                .OfType<OsvVulnerability>()
+                .ToList();
+            foreach (var detail in AliasDeduplicator.Representatives(records))
             {
-                if (!details.TryGetValue(reference.Id, out var detail))
-                {
-                    continue;
-                }
-
                 var vulnerability = stored[detail.Id];
                 current.Add(vulnerability.Id);
                 var (fixedVersions, suggested) = FixedVersionResolver.Resolve(detail.Affected, purl);

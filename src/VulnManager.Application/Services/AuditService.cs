@@ -42,6 +42,13 @@ public sealed class AuditService(IAuditLogRepository auditLog, IUnitOfWork unitO
             time.GetUtcNow()));
     }
 
+    /// <summary>Records and saves immediately, for actions that have no other change to persist.</summary>
+    public async Task RecordNowAsync(Actor actor, string action, string entityType, object entityId, object? details = null, CancellationToken cancellationToken = default)
+    {
+        Record(actor, action, entityType, entityId, details);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
     public Task<PagedResult<AuditEntryDto>> ListAsync(Actor actor, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);

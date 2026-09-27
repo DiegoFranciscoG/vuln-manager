@@ -5,6 +5,9 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <RootNamespace>VulnManager.IntegrationTests</RootNamespace>
+    <!-- Test-only: WireMock's Handlebars helpers pin Humanizer 2.14.1 resource packages while the app (CycloneDX.Core ->
+         JsonSchema.Net) uses Humanizer.Core 3.0.10. Templating is not used by these tests. -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +26,7 @@
 
   <ItemGroup>
     <None Include="../fixtures/**/*" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

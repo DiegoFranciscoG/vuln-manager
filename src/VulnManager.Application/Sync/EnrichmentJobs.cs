@@ -25,9 +25,12 @@ public sealed class KevSyncJob(
     public async Task<SyncJobResult> RunAsync(SyncRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        // Watermark: "etag|last-modified (RFC 1123)|catalogVersion".
         var previous = await syncRuns.LatestSuccessfulAsync(SyncSource.Kev, cancellationToken);
-        var etag = previous?.Watermark?.Split('|')[0];
-        var fetched = await client.FetchAsync(string.IsNullOrEmpty(etag) ? null : etag, cancellationToken);
+        var parts = previous?.Watermark?.Split('|') ?? [];
+        var etag = parts.Length > 0 && parts[0].Length > 0 ? parts[0] : null;
+        DateTimeOffset? lastModified = parts.Length > 1 && DateTimeOffset.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var lm) ? lm : null;
+        var fetched = await client.FetchAsync(etag, lastModified, cancellationToken);
         if (fetched.NotModified)
         {
             return new SyncJobResult(SyncRunStatus.Skipped, 0, 0, previous?.Watermark, []);
@@ -71,7 +74,7 @@ public sealed class KevSyncJob(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         var affected = await findings.GetProjectsWithVulnerabilitiesAsync(changedVulnerabilities, cancellationToken);
-        var watermark = $"{fetched.ETag}|{fetched.CatalogVersion}";
+        var watermark = $"{fetched.ETag}|{fetched.LastModified?.ToString("R", CultureInfo.InvariantCulture)}|{fetched.CatalogVersion}";
         return new SyncJobResult(SyncRunStatus.Succeeded, fetched.Entries.Count, updated, watermark, affected);
     }
 }

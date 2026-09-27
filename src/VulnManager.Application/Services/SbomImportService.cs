@@ -64,7 +64,18 @@ public sealed class SbomImportService(
         var existing = await imports.FindByHashAsync(projectId, sha256, cancellationToken);
         if (existing is not null)
         {
-            return new SbomImportResultDto(existing.ToDto(), false, 0, ReconciliationResult.Empty, false);
+            // Idempotent: never a second import row. If an older SBOM is sent again (rollback of a dependency),
+            // it becomes the current inventory again so regressions reopen their findings.
+            if (project.CurrentSbomImportId == existing.Id)
+            {
+                return new SbomImportResultDto(existing.ToDto(), false, 0, ReconciliationResult.Empty, false);
+            }
+
+            project.SetCurrentInventory(existing.Id, time.GetUtcNow());
+            audit.Record(actor, AuditActions.SbomImported, "sbom_import", existing.Id, new { projectId, reactivated = true });
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            var reactivated = await reconciliation.ReconcileProjectAsync(projectId, cancellationToken);
+            return new SbomImportResultDto(existing.ToDto(), false, 0, reactivated, false);
         }
 
         string json;

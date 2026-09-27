@@ -1,0 +1,82 @@
+@page "/sync"
+@inherits AppComponentBase
+@using VulnManager.Application.Abstractions
+@inject ISyncDispatcher Dispatcher
+
+<PageTitle>Sincronización · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Sincronización</h1>
+        <p class="muted">Cada ejecución registra peticiones HTTP, respuestas limitadas (429/403), elementos actualizados y la marca de agua. Una segunda ejecución sin datos nuevos actualiza 0 elementos (idempotencia).</p>
+    </div>
+    <AuthorizeView Roles="@AppRoles.Admin">
+        <div class="actions">
+            <button class="btn btn-primary" @onclick="() => RunAsync(null)">Sincronizar todo</button>
+            @foreach (var source in Enum.GetValues<SyncSource>())
+            {
+                <button class="btn" @onclick="() => RunAsync(source)">@source.ToString().ToUpperInvariant()</button>
+            }
+        </div>
+    </AuthorizeView>
+</div>
+
+<Messages Error="@ErrorMessage" Success="@SuccessMessage" />
+
+<section class="card">
+    <table class="table">
+        <thead><tr><th>Inicio</th><th>Fuente</th><th>Disparador</th><th>Estado</th><th class="num">Pedidos</th><th class="num">Actualizados</th><th class="num">HTTP</th><th class="num">Limitadas</th><th>Marca de agua</th><th>Error</th></tr></thead>
+        <tbody>
+            @foreach (var r in runs)
+            {
+                <tr>
+                    <td>@Date(r.StartedAt)</td>
+                    <td>@r.Source.ToString().ToUpperInvariant()</td>
+                    <td>@Labels.Of(r.Trigger)</td>
+                    <td><span class="badge sync-@r.Status.ToString().ToLowerInvariant()">@Labels.Of(r.Status)</span></td>
+                    <td class="num">@r.ItemsRequested</td>
+                    <td class="num">@r.ItemsUpdated</td>
+                    <td class="num">@r.HttpRequests</td>
+                    <td class="num">@r.HttpThrottled</td>
+                    <td class="small">@r.Watermark</td>
+                    <td class="small error-text">@r.ErrorMessage</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button class="btn btn-ghost" @onclick="LoadAsync">Actualizar</button>
+</section>
+
+<section class="card">
+    <h2>Límites respetados</h2>
+    <ul class="small">
+        <li><strong>NVD:</strong> 5 peticiones por ventana móvil de 30 s sin clave (50 con clave) y 6 s entre peticiones; solo se consulta para CVE sin CVSS.</li>
+        <li><strong>OSV.dev:</strong> sin límite documentado; lotes de 100 PURL y 4 consultas de detalle en paralelo.</li>
+        <li><strong>EPSS (FIRST):</strong> hasta 100 CVE por petición (máx. 2000 caracteres), una vez al día tras la publicación de ~13:30 UTC.</li>
+        <li><strong>CISA KEV:</strong> GET condicional (ETag) cada 6 horas.</li>
+        <li><strong>CVE Services:</strong> ≤ 60 peticiones por minuto para leer SSVC de CISA Vulnrichment.</li>
+    </ul>
+</section>
+
+@code {
+    private IReadOnlyList<SyncRunDto> runs = [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        await TryAsync(async () => runs = await Ui.RunAsync<DashboardService, IReadOnlyList<SyncRunDto>>(s => s.RecentSyncRunsAsync(100)));
+
+    private async Task RunAsync(SyncSource? source)
+    {
+        var actor = await ActorAsync();
+        await TryAsync(async () =>
+        {
+            if (!actor.IsAdmin || !Dispatcher.TryEnqueue(new SyncRequest(source, SyncTrigger.Manual)))
+            {
+                throw new VulnManager.Application.Exceptions.ConflictException("No se pudo encolar la sincronización.");
+            }
+
+            await Ui.RunAsync<AuditService>(s => s.RecordNowAsync(actor, AuditActions.SyncTriggered, "sync", source?.ToString() ?? "ALL"));
+        }, "Sincronización encolada; recarga la tabla en unos segundos.");
+    }
+}

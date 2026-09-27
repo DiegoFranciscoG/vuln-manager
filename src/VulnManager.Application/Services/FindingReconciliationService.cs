@@ -66,7 +66,8 @@ public sealed partial class FindingReconciliationService(
                    ?? throw new InvalidOperationException("There is no active priority rule; the database seed did not run.");
         var ruleSet = rule.ToRuleSet();
         var slaSettings = rule.ToSlaSettings();
-        var now = time.GetUtcNow();
+        // PostgreSQL stores microseconds; truncating keeps recalculated values identical to the stored ones (idempotency).
+        var now = TruncateToMicroseconds(time.GetUtcNow());
         var today = DateOnly.FromDateTime(now.UtcDateTime);
 
         var inventory = project.ArchivedAt is null
@@ -141,9 +142,10 @@ public sealed partial class FindingReconciliationService(
                 slaChanged++;
             }
 
-            if (isNew && finding.Status == FindingStatus.New)
+            // Raised whenever an open finding meets the condition (on creation or after an escalation); dedup keys keep it to one alert.
+            if (finding.Status == FindingStatus.New)
             {
-                pendingAlerts.AddRange(AlertsForNewFinding(project, finding, vulnerability, component));
+                pendingAlerts.AddRange(AlertsFor(project, finding, vulnerability, component, now));
             }
         }
 
@@ -222,9 +224,8 @@ public sealed partial class FindingReconciliationService(
         return added;
     }
 
-    private static IEnumerable<Alert> AlertsForNewFinding(Project project, Finding finding, Vulnerability vulnerability, Component component)
+    private static IEnumerable<Alert> AlertsFor(Project project, Finding finding, Vulnerability vulnerability, Component component, DateTimeOffset now)
     {
-        var now = finding.FirstDetectedAt;
         var label = $"{vulnerability.CveId ?? vulnerability.ExternalId} en {component.Name}@{component.Version} ({project.Name})";
         if (finding.PriorityLevel == PriorityLevel.P1)
         {
@@ -303,6 +304,8 @@ public sealed partial class FindingReconciliationService(
             sla.Ssvc?.TechnicalImpact,
             sla.Ssvc?.TechnicalImpactSource,
             vulnerability.Severity);
+
+    internal static DateTimeOffset TruncateToMicroseconds(DateTimeOffset value) => value.AddTicks(-(value.Ticks % 10));
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Project {ProjectId} reconciled: created={Created} reopened={Reopened} closed={Closed} vex={Vex} priority={Priority} sla={Sla} alerts={Alerts}")]
     private static partial void LogReconciled(ILogger logger, Guid projectId, int created, int reopened, int closed, int vex, int priority, int sla, int alerts);
