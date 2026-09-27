@@ -1,0 +1,41 @@
+# Render Blueprint (plan free). La base de datos vive en Neon (Render Postgres free expira a los 30 días).
+# Los valores con "sync: false" se piden en el panel de Render al crear el Blueprint; nunca se versionan.
+services:
+  - type: web
+    name: vuln-manager
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health/live
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ForwardedHeaders__Enabled
+        value: "true"
+      - key: Database__ApplyMigrationsOnStartup
+        value: "true"
+      - key: Seed__DemoData
+        value: "true"
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Jwt__Secret
+        generateValue: true
+      - key: Sync__TriggerToken
+        generateValue: true
+      - key: Seed__AdminEmail
+        value: admin@vulnmanager.test
+      - key: Seed__AdminPassword
+        sync: false
+      - key: Seed__ViewerEmail
+        value: viewer@vulnmanager.test
+      - key: Seed__ViewerPassword
+        sync: false
+      - key: ExternalSources__NvdApiKey
+        sync: false
+      - key: AlertWebhook__Url
+        sync: false
+      - key: AlertWebhook__PublicBaseUrl
+        sync: false
