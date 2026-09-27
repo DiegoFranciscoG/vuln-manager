@@ -118,6 +118,18 @@ public sealed class Finding
 
     public void MarkSeen(DateTimeOffset now) => LastSeenAt = now;
 
+    /// <summary>A newer VEX statement replaced the one that justified NOT_AFFECTED.</summary>
+    public void RelinkVex(Guid vexStatementId, DateTimeOffset now)
+    {
+        if (Status != FindingStatus.NotAffected)
+        {
+            throw new DomainException("Solo un hallazgo NOT_AFFECTED se enlaza a una declaración VEX.");
+        }
+
+        VexStatementId = vexStatementId;
+        UpdatedAt = now;
+    }
+
     /// <summary>Returns true when the level or its explanation changed.</summary>
     public bool ApplyPriority(PriorityLevel level, Guid ruleId, string explanationJson, DateTimeOffset now)
     {
