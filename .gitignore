@@ -1,0 +1,37 @@
+# ---- Secretos y entorno
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# ---- .NET
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+coverage.cobertura.xml
+*.user
+*.suo
+*.rsuser
+*.nupkg
+efbundle
+efbundle.exe
+*.log
+
+# ---- IDE / SO
+.vs/
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
