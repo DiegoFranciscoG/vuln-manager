@@ -1,0 +1,107 @@
+### vuln-manager — colección de ejemplos (VS Code REST Client o JetBrains HTTP Client)
+# Las credenciales se leen del .env local ({{$dotenv ...}}); nunca se escriben en este archivo.
+# Swagger UI: http://127.0.0.1:8080/swagger · OpenAPI: /openapi/v1.json
+
+@baseUrl = http://127.0.0.1:8080
+
+### 1. Token de acceso (15 min). Límite: 10 intentos por minuto por IP.
+# @name login
+POST {{baseUrl}}/api/auth/token
+Content-Type: application/json
+
+{
+  "email": "{{$dotenv SEED_ADMIN_EMAIL}}",
+  "password": "{{$dotenv SEED_ADMIN_PASSWORD}}"
+}
+
+###
+@token = {{login.response.body.accessToken}}
+
+### 2. Crear proyecto (Admin). La exposición PUBLIC activa las filas de BOD 26-04 para activos expuestos.
+# @name project
+POST {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "facturador-sri",
+  "description": "Backend Spring Boot del facturador electrónico",
+  "repositoryUrl": "https://github.com/DiegoFranciscoG/facturador-sri",
+  "exposure": "PUBLIC",
+  "environment": "PRODUCTION",
+  "assetType": "APPLICATION"
+}
+
+###
+@projectId = {{project.response.body.id}}
+
+### 3. Subir un SBOM CycloneDX (1.4-1.7, máx. 10 MiB). Reenviar el mismo archivo devuelve 200 (idempotente).
+POST {{baseUrl}}/api/projects/{{projectId}}/sboms?sourceRef=main
+Authorization: Bearer {{token}}
+Content-Type: application/vnd.cyclonedx+json
+
+< ./sbom-real/facturador-sri.cdx.json
+
+### 4. Crear una API key del proyecto para CI (el secreto se muestra una sola vez; caduca en 90 días por defecto).
+POST {{baseUrl}}/api/projects/{{projectId}}/api-keys
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "github-actions",
+  "expiresInDays": 90
+}
+
+### 5. Hallazgos nuevos P1/P2 ordenados por vencimiento de SLA (los enums usan los mismos nombres que el JSON).
+GET {{baseUrl}}/api/findings?projectId={{projectId}}&status=NEW&priority=P1&priority=P2&sort=SLA_DUE&pageSize=50
+Authorization: Bearer {{token}}
+
+### 6. Detalle de un hallazgo con la explicación de prioridad y SLA.
+GET {{baseUrl}}/api/findings/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+### 7. Triage (Analyst/Admin): MITIGATED, FALSE_POSITIVE, ACCEPTED (con riskAcceptedUntil) o NEW. La justificación es obligatoria.
+POST {{baseUrl}}/api/findings/00000000-0000-0000-0000-000000000000/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "ACCEPTED",
+  "justification": "Servicio interno sin tráfico externo; se actualiza en la ventana de mantenimiento.",
+  "riskAcceptedUntil": "2026-10-31"
+}
+
+### 8. Registrar una declaración VEX con su justificación (CISA VEX / CycloneDX 1.7).
+POST {{baseUrl}}/api/projects/{{projectId}}/vex-statements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "vulnerabilityRef": "CVE-2021-45046",
+  "componentPurl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.15.0",
+  "status": "NOT_AFFECTED",
+  "justification": "vulnerable_code_not_in_execute_path",
+  "impactStatement": "La aplicación no usa patrones de Thread Context en el layout de logs."
+}
+
+### 9. Exportar hallazgos a CSV (protegido contra inyección de fórmulas).
+GET {{baseUrl}}/api/findings/export.csv?projectId={{projectId}}
+Authorization: Bearer {{token}}
+
+### 10. Lanzar una sincronización manual (Admin) y consultar el historial.
+POST {{baseUrl}}/api/sync
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+###
+GET {{baseUrl}}/api/sync/runs?take=10
+Authorization: Bearer {{token}}
+
+### 11. Regla de prioridad activa (tabla de decisión versionada).
+GET {{baseUrl}}/api/priority-rules/active
+Authorization: Bearer {{token}}
+
+### 12. Salud (pública).
+GET {{baseUrl}}/health/live
