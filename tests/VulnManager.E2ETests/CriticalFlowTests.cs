@@ -94,17 +94,21 @@ public sealed partial class CriticalFlowTests : IAsyncLifetime
         await CaptureAsync(page, "03-detalle-hallazgo", fullPage: true);
 
         await page.GotoAsync($"{BaseUrl}/");
-        await page.Locator("table a[href^='/projects/']").First.ClickAsync();
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Declaraciones VEX" })).ToBeVisibleAsync();
-        await CaptureAsync(page, "04-proyecto", fullPage: true);
+        var projectLink = page.Locator("table a[href^='/projects/']", new() { HasText = "portal-ciudadano-demo" });
+        await ((await projectLink.CountAsync()) > 0 ? projectLink.First : page.Locator("table a[href^='/projects/']").First).ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Tab, new() { Name = "VEX" }).Or(page.GetByRole(AriaRole.Button, new() { Name = "VEX", Exact = true }))).ToBeVisibleAsync();
+        await CaptureAsync(page, "04-proyecto");
+
+        await ClickUntilVisibleAsync(page.GetByRole(AriaRole.Button, new() { Name = "VEX", Exact = true }), page.GetByRole(AriaRole.Heading, new() { Name = "Declaraciones VEX" }));
+        await CaptureAsync(page, "05-vex", fullPage: true);
 
         foreach (var (path, heading, name) in new[]
                  {
-                     ("/rules", "Reglas de prioridad", "05-reglas"),
-                     ("/sync", "Sincronización", "06-sincronizacion"),
-                     ("/alerts", "Alertas", "07-alertas"),
-                     ("/sources", "Fuentes de datos", "08-fuentes"),
-                     ("/audit", "Auditoría", "09-auditoria"),
+                     ("/rules", "Reglas de prioridad", "06-reglas"),
+                     ("/sync", "Sincronización", "07-sincronizacion"),
+                     ("/alerts", "Alertas", "08-alertas"),
+                     ("/sources", "Fuentes de datos", "09-fuentes"),
+                     ("/audit", "Auditoría", "10-auditoria"),
                  })
         {
             await page.GotoAsync(BaseUrl + path);
@@ -126,6 +130,26 @@ public sealed partial class CriticalFlowTests : IAsyncLifetime
             TimezoneId = "America/Guayaquil",
         });
         return await context.NewPageAsync();
+    }
+
+    /// <summary>Interactive Server buttons only react once the circuit is connected, so the click is retried briefly.</summary>
+    private static async Task ClickUntilVisibleAsync(ILocator button, ILocator expected)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            await button.ClickAsync();
+            try
+            {
+                await expected.WaitForAsync(new LocatorWaitForOptions { Timeout = 1000 });
+                return;
+            }
+            catch (TimeoutException)
+            {
+                // Circuit not ready yet: try again.
+            }
+        }
+
+        await Assertions.Expect(expected).ToBeVisibleAsync();
     }
 
     private static async Task CaptureAsync(IPage page, string name, bool fullPage = false)
