@@ -90,7 +90,7 @@ else
                     }
                     else
                     {
-                        <span class="badge sync-@run.Status.ToString().ToLowerInvariant()">@run.Status</span>
+                        <span class="badge sync-@run.Status.ToString().ToLowerInvariant()">@Labels.Of(run.Status)</span>
                         <span class="muted small">@Date(run.FinishedAt ?? run.StartedAt)</span>
                     }
                 </div>

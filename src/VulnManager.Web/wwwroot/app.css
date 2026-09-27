@@ -92,6 +92,8 @@ code, pre { font-family: "Cascadia Code", Consolas, "SFMono-Regular", monospace;
 
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1.25rem; }
 .grid-2 > .card { margin-bottom: 0; }
+.grid-2 > * { min-width: 0; }
+.table.compact td code { overflow-wrap: anywhere; }
 .grid-2 + .grid-2 { margin-top: 1.25rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.5rem 1rem; margin-bottom: 1rem; }
 
@@ -113,6 +115,8 @@ code, pre { font-family: "Cascadia Code", Consolas, "SFMono-Regular", monospace;
 .table th, .table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
 .table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
 .table tbody tr:hover { background: var(--hover); }
+/* QuickGrid pads each page with empty rows so the pager does not jump; they add no information. */
+.table tbody tr:not(:has(td:not(:empty))) { display: none; }
 .table.compact th { width: 38%; text-transform: none; letter-spacing: 0; font-size: 0.85rem; }
 .table .revoked, tr.revoked { opacity: 0.55; }
 .grid th button { color: var(--muted); }
@@ -207,3 +211,4 @@ pre.details { white-space: pre-wrap; max-height: 320px; overflow: auto; backgrou
 nav[aria-label] + * { min-width: 0; }
 .paginator { display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end; margin-top: 0.75rem; color: var(--muted); font-size: 0.85rem; }
 .paginator button { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.2rem 0.5rem; cursor: pointer; }
+.paginator button:disabled { opacity: 0.45; cursor: default; }

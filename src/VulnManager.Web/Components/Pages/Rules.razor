@@ -32,9 +32,9 @@
                 {
                     <tr>
                         <td>@r.Id</td>
-                        <td>@List(r.When.Exploitation)</td>
-                        <td>@List(r.When.Impact)</td>
-                        <td>@List(r.When.Exposure)</td>
+                        <td>@List(r.When.Exploitation, Labels.Of)</td>
+                        <td>@List(r.When.Impact, Labels.Of)</td>
+                        <td>@List(r.When.Exposure, Labels.Of)</td>
                         <td><Badges Priority="r.Level" /></td>
                         <td>@r.Reason</td>
                     </tr>
@@ -146,5 +146,5 @@
         }
     }
 
-    private static string List<T>(IReadOnlyList<T>? values) => values is null ? "cualquiera" : string.Join(", ", values);
+    private static string List<T>(IReadOnlyList<T>? values, Func<T, string> label) => values is null ? "cualquiera" : string.Join(", ", values.Select(label));
 }

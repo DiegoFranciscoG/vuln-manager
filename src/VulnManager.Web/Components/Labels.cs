@@ -33,6 +33,8 @@ public static class Labels
 
     public static string Of(Exposure exposure) => exposure == Exposure.Public ? "Pública (Internet)" : "Interna";
 
+    public static string Of(DeploymentEnvironment environment) => environment == DeploymentEnvironment.Production ? "Producción" : "Desarrollo";
+
     public static string Of(VexStatus status) => status switch
     {
         VexStatus.NotAffected => "No afectado",
@@ -67,6 +69,28 @@ public static class Labels
         ExploitationSignal.Active => "Confirmada",
         ExploitationSignal.Likely => "Probable (EPSS)",
         _ => "Sin evidencia",
+    };
+
+    public static string Of(ImpactSignal impact) => impact == ImpactSignal.High ? "Alto" : "Limitado";
+
+    public static string Of(SyncRunStatus status) => status switch
+    {
+        SyncRunStatus.Running => "En curso",
+        SyncRunStatus.Succeeded => "Correcta",
+        SyncRunStatus.Partial => "Parcial",
+        SyncRunStatus.Failed => "Fallida",
+        SyncRunStatus.Skipped => "Sin cambios",
+        _ => status.ToString(),
+    };
+
+    public static string Of(SyncTrigger trigger) => trigger switch
+    {
+        SyncTrigger.Scheduled => "Programada",
+        SyncTrigger.Manual => "Manual",
+        SyncTrigger.SbomImport => "Carga de SBOM",
+        SyncTrigger.Startup => "Arranque",
+        SyncTrigger.External => "Cron externo",
+        _ => trigger.ToString(),
     };
 
     public static string Of(SsvcDataSource? source) => source switch

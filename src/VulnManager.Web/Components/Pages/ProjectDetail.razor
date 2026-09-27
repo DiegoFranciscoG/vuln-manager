@@ -16,7 +16,7 @@ else
             <p class="muted">
                 @(project.Description ?? "Sin descripción")
                 · <span class="badge @(project.Exposure == Exposure.Public ? "exposure-public" : "exposure-internal")">@Labels.Of(project.Exposure)</span>
-                · @project.Environment
+                · @Labels.Of(project.Environment)
                 @if (project.RepositoryUrl is not null)
                 {
                     <span> · <a href="@project.RepositoryUrl" target="_blank" rel="noopener noreferrer">Repositorio</a></span>

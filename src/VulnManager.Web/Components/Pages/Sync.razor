@@ -32,8 +32,8 @@
                 <tr>
                     <td>@Date(r.StartedAt)</td>
                     <td>@r.Source.ToString().ToUpperInvariant()</td>
-                    <td>@r.Trigger</td>
-                    <td><span class="badge sync-@r.Status.ToString().ToLowerInvariant()">@r.Status</span></td>
+                    <td>@Labels.Of(r.Trigger)</td>
+                    <td><span class="badge sync-@r.Status.ToString().ToLowerInvariant()">@Labels.Of(r.Status)</span></td>
                     <td class="num">@r.ItemsRequested</td>
                     <td class="num">@r.ItemsUpdated</td>
                     <td class="num">@r.HttpRequests</td>
