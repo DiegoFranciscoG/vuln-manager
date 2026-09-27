@@ -103,13 +103,15 @@ public class ExternalClientsTests
         {
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Fixtures.Read("kev/kev-subset.json")) };
             response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"1abf00-65c534c8b3b50\"");
+            response.Content.Headers.LastModified = new DateTimeOffset(2026, 9, 25, 18, 58, 16, TimeSpan.Zero);
             return response;
         });
         var client = new KevClient(Client(handler, "https://kev.test/feed.json"));
 
-        var result = await client.FetchAsync(null, TestContext.Current.CancellationToken);
+        var result = await client.FetchAsync(null, null, TestContext.Current.CancellationToken);
 
         result.NotModified.Should().BeFalse();
+        result.LastModified.Should().Be(new DateTimeOffset(2026, 9, 25, 18, 58, 16, TimeSpan.Zero));
         result.CatalogVersion.Should().Be("2026.09.25");
         result.ETag.Should().Be("\"1abf00-65c534c8b3b50\"");
         var log4shell = result.Entries.Single(e => e.CveId == "CVE-2021-44228");
@@ -124,9 +126,12 @@ public class ExternalClientsTests
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotModified));
         var client = new KevClient(Client(handler, "https://kev.test/feed.json"));
 
-        var result = await client.FetchAsync("\"1abf00-65c534c8b3b50\"", TestContext.Current.CancellationToken);
+        var lastModified = new DateTimeOffset(2026, 9, 25, 18, 58, 16, TimeSpan.Zero);
+        var result = await client.FetchAsync("\"1abf00-65c534c8b3b50\"", lastModified, TestContext.Current.CancellationToken);
 
         result.NotModified.Should().BeTrue();
-        handler.Requests.Single().Headers.IfNoneMatch.Should().ContainSingle().Which.Tag.Should().Be("\"1abf00-65c534c8b3b50\"");
+        var sent = handler.Requests.Single().Headers;
+        sent.IfNoneMatch.Should().ContainSingle().Which.Tag.Should().Be("\"1abf00-65c534c8b3b50\"");
+        sent.IfModifiedSince.Should().Be(lastModified, "the CISA CDN answers 304 to If-Modified-Since");
     }
 }

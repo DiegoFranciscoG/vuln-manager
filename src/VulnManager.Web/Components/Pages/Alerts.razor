@@ -1,0 +1,92 @@
+@page "/alerts"
+@inherits AppComponentBase
+
+<PageTitle>Alertas · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Alertas</h1>
+        <p class="muted">Nuevos P1, coincidencias con KEV, triage forense y SLA por vencer o vencido. Si se configura un webhook HTTPS, también se envían allí (Render bloquea SMTP).</p>
+    </div>
+    <label class="check"><input type="checkbox" checked="@onlyOpen" @onchange="ToggleAsync" /> Solo abiertas</label>
+</div>
+
+<Messages Error="@ErrorMessage" Success="@SuccessMessage" />
+
+<section class="card">
+    @if (alerts is null)
+    {
+        <p class="muted">Cargando…</p>
+    }
+    else if (alerts.Items.Count == 0)
+    {
+        <p class="muted">Sin alertas.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Proyecto</th><th>Mensaje</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var a in alerts.Items)
+                {
+                    <tr class="@(a.AcknowledgedAt is null ? "" : "revoked")">
+                        <td>@Date(a.CreatedAt)</td>
+                        <td><span class="badge alert-@a.Type.ToString().ToLowerInvariant()">@Labels.Of(a.Type)</span></td>
+                        <td><a href="/projects/@a.ProjectId">@a.ProjectName</a></td>
+                        <td>
+                            @if (a.FindingId is { } findingId)
+                            {
+                                <a href="/findings/@findingId">@a.Message</a>
+                            }
+                            else
+                            {
+                                @a.Message
+                            }
+                        </td>
+                        <td>
+                            @if (a.AcknowledgedAt is null)
+                            {
+                                <AuthorizeView Policy="@AppPolicies.CanTriage">
+                                    <button class="btn btn-ghost small" @onclick="() => AcknowledgeAsync(a.Id)">Atender</button>
+                                </AuthorizeView>
+                            }
+                            else
+                            {
+                                <span class="muted small">atendida</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="muted small">@alerts.Total alertas.</p>
+    }
+</section>
+
+@code {
+    private PagedResult<AlertDto>? alerts;
+    private bool onlyOpen = true;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var actor = await ActorAsync();
+        await TryAsync(async () => alerts = await Ui.RunAsync<AlertService, PagedResult<AlertDto>>(s => s.ListAsync(actor, null, onlyOpen, 1, 100)));
+    }
+
+    private async Task ToggleAsync(ChangeEventArgs e)
+    {
+        onlyOpen = e.Value is true;
+        await LoadAsync();
+    }
+
+    private async Task AcknowledgeAsync(Guid id)
+    {
+        var actor = await ActorAsync();
+        if (await TryAsync(() => Ui.RunAsync<AlertService>(s => s.AcknowledgeAsync(actor, id)), "Alerta atendida."))
+        {
+            await LoadAsync();
+        }
+    }
+}

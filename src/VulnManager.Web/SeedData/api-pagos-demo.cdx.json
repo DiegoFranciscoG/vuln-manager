@@ -1,0 +1,74 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:4c2a8d3b-6e5f-4a7b-9c0d-1e2f3a4b5c6d",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-09-26T12:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "cyclonedx-demo-generator",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "app",
+      "name": "api-pagos-demo",
+      "version": "1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "Newtonsoft.Json@12.0.1",
+      "name": "Newtonsoft.Json",
+      "version": "12.0.1",
+      "purl": "pkg:nuget/Newtonsoft.Json@12.0.1",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "System.Text.Encodings.Web@4.5.0",
+      "name": "System.Text.Encodings.Web",
+      "version": "4.5.0",
+      "purl": "pkg:nuget/System.Text.Encodings.Web@4.5.0",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "System.Security.Cryptography.Xml@4.5.0",
+      "name": "System.Security.Cryptography.Xml",
+      "version": "4.5.0",
+      "purl": "pkg:nuget/System.Security.Cryptography.Xml@4.5.0",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "lodash@4.17.15",
+      "name": "lodash",
+      "version": "4.17.15",
+      "purl": "pkg:npm/lodash@4.17.15",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "axios@0.21.1",
+      "name": "axios",
+      "version": "0.21.1",
+      "purl": "pkg:npm/axios@0.21.1",
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "minimist@1.2.5",
+      "name": "minimist",
+      "version": "1.2.5",
+      "purl": "pkg:npm/minimist@1.2.5",
+      "scope": "required"
+    }
+  ]
+}

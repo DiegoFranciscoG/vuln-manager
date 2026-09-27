@@ -1,0 +1,50 @@
+@page "/sources"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Fuentes y licencias · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Fuentes de datos y licencias</h1>
+        <p class="muted">Cómo se usa cada fuente y bajo qué términos. Detalle y fechas de verificación en <code>docs/investigacion.md</code>.</p>
+    </div>
+</div>
+
+<section class="card">
+    <table class="table">
+        <thead><tr><th>Fuente</th><th>Uso en vuln-manager</th><th>Licencia / aviso</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><a href="https://osv.dev" target="_blank" rel="noopener noreferrer">OSV.dev</a> (incluye GitHub Advisory Database)</td>
+                <td>Cruce componente → vulnerabilidad por PURL, rangos y versiones corregidas.</td>
+                <td>Cada registro conserva la licencia de su fuente; GitHub Advisory Database: CC-BY 4.0.</td>
+            </tr>
+            <tr>
+                <td><a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener noreferrer">CISA KEV</a></td>
+                <td>Evidencia de explotación activa; inicio del plazo BOD 26-04.</td>
+                <td>Dominio público (U.S. Government).</td>
+            </tr>
+            <tr>
+                <td><a href="https://github.com/cisagov/vulnrichment" target="_blank" rel="noopener noreferrer">CISA Vulnrichment</a> vía CVE Services</td>
+                <td>SSVC: Exploitation, Automatable y Technical Impact para la Tabla 1 de la BOD 26-04.</td>
+                <td>CC0-1.0. CVE® es una marca registrada de The MITRE Corporation; Copyright © The MITRE Corporation, usado bajo los <a href="https://www.cve.org/Legal/TermsOfUse" target="_blank" rel="noopener noreferrer">CVE Terms of Use</a>.</td>
+            </tr>
+            <tr>
+                <td><a href="https://www.first.org/epss/" target="_blank" rel="noopener noreferrer">FIRST EPSS</a></td>
+                <td>Probabilidad de explotación en 30 días y su percentil (umbral por percentil, nunca multiplicado por CVSS).</td>
+                <td>Uso libre; atribución a FIRST EPSS.</td>
+            </tr>
+            <tr>
+                <td><a href="https://nvd.nist.gov" target="_blank" rel="noopener noreferrer">NIST NVD</a></td>
+                <td>Solo para completar CVSS cuando OSV y el CNA no lo publican, respetando 5 peticiones/30 s.</td>
+                <td>This product uses data from the NVD API but is not endorsed or certified by the NVD.</td>
+            </tr>
+            <tr>
+                <td><a href="https://www.cisa.gov/news-events/directives/bod-26-04-prioritizing-security-updates-based-risk" target="_blank" rel="noopener noreferrer">CISA BOD 26-04</a></td>
+                <td>Plazos de remediación (Tabla 1) por exposición, KEV, automatizable e impacto técnico.</td>
+                <td>Documento público del gobierno de EE. UU.</td>
+            </tr>
+        </tbody>
+    </table>
+</section>

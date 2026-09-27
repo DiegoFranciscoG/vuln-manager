@@ -1,0 +1,40 @@
+<EditForm Model="Model" OnValidSubmit="OnSubmit" FormName="project" class="form-grid">
+    <DataAnnotationsValidator />
+    <label>Nombre<InputText @bind-Value="Model.Name" maxlength="100" /></label>
+    <label>Repositorio (https)<InputText @bind-Value="Model.RepositoryUrl" placeholder="https://github.com/..." /></label>
+    <label class="span-2">Descripción<InputTextArea @bind-Value="Model.Description" rows="2" maxlength="500" /></label>
+    <label>
+        Exposición (BOD 26-04)
+        <InputSelect @bind-Value="Model.Exposure">
+            <option value="@Exposure.Public">Pública: accesible desde Internet sin autenticación confiable</option>
+            <option value="@Exposure.Internal">Interna</option>
+        </InputSelect>
+    </label>
+    <label>
+        Entorno
+        <InputSelect @bind-Value="Model.Environment">
+            <option value="@DeploymentEnvironment.Production">Producción</option>
+            <option value="@DeploymentEnvironment.Development">Desarrollo</option>
+        </InputSelect>
+    </label>
+    <label>
+        Tipo de activo
+        <InputSelect @bind-Value="Model.AssetType">
+            <option value="@AssetType.Application">Aplicación</option>
+            <option value="@AssetType.Server">Servidor</option>
+            <option value="@AssetType.NetworkDevice">Dispositivo de red</option>
+        </InputSelect>
+    </label>
+    <ValidationSummary />
+    <div><button type="submit" class="btn btn-primary" disabled="@Busy">@SubmitText</button></div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public ProjectRequest Model { get; set; } = default!;
+
+    [Parameter] public EventCallback OnSubmit { get; set; }
+
+    [Parameter] public string SubmitText { get; set; } = "Guardar";
+
+    [Parameter] public bool Busy { get; set; }
+}

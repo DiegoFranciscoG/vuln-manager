@@ -1,0 +1,29 @@
+@page "/findings"
+@inherits AppComponentBase
+
+<PageTitle>Hallazgos · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Hallazgos</h1>
+        <p class="muted">Todos los proyectos. El orden por prioridad desempata por KEV, ransomware, percentil EPSS, CVSS, parche disponible y vencimiento.</p>
+    </div>
+</div>
+
+<section class="card">
+    <FindingsGrid InitialStatus="@Status" InitialPriority="@Priority" InitialKev="@Kev" InitialOverdue="@(Overdue ?? false)" />
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "status")]
+    private string? Status { get; set; }
+
+    [SupplyParameterFromQuery(Name = "priority")]
+    private string? Priority { get; set; }
+
+    [SupplyParameterFromQuery(Name = "kev")]
+    private bool? Kev { get; set; }
+
+    [SupplyParameterFromQuery(Name = "overdue")]
+    private bool? Overdue { get; set; }
+}

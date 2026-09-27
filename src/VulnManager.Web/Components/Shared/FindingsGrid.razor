@@ -1,0 +1,193 @@
+@inherits AppComponentBase
+
+<form class="filters" @onsubmit="ApplyAsync" @onsubmit:preventDefault>
+    <label>
+        Estado
+        <select @bind="status">
+            <option value="">Todos</option>
+            @foreach (var s in Enum.GetValues<FindingStatus>())
+            {
+                <option value="@s">@Labels.Of(s)</option>
+            }
+        </select>
+    </label>
+    <label>
+        Prioridad
+        <select @bind="priority">
+            <option value="">Todas</option>
+            @foreach (var p in Enum.GetValues<PriorityLevel>())
+            {
+                <option value="@p">@p</option>
+            }
+        </select>
+    </label>
+    <label>
+        Severidad
+        <select @bind="severity">
+            <option value="">Todas</option>
+            @foreach (var s in new[] { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Unknown })
+            {
+                <option value="@s">@Labels.Of(s)</option>
+            }
+        </select>
+    </label>
+    <label>
+        KEV
+        <select @bind="kev">
+            <option value="">Todos</option>
+            <option value="true">Solo KEV</option>
+            <option value="false">Fuera de KEV</option>
+        </select>
+    </label>
+    <label class="check"><input type="checkbox" @bind="overdue" /> SLA vencido</label>
+    <label class="check"><input type="checkbox" @bind="fixAvailable" /> Con parche</label>
+    <label class="grow">
+        Buscar
+        <input type="search" @bind="search" maxlength="100" placeholder="CVE, GHSA, paquete…" />
+    </label>
+    <label>
+        Orden
+        <select @bind="sort">
+            <option value="@FindingSort.Priority">Prioridad</option>
+            <option value="@FindingSort.SlaDue">Vencimiento SLA</option>
+            <option value="@FindingSort.Epss">EPSS</option>
+            <option value="@FindingSort.Cvss">CVSS</option>
+            <option value="@FindingSort.Detected">Más recientes</option>
+        </select>
+    </label>
+    <div class="filter-actions">
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        <a class="btn" href="@CsvUrl" target="_blank" rel="noopener" data-enhance-nav="false">Exportar CSV</a>
+    </div>
+</form>
+
+<Messages Error="@ErrorMessage" />
+
+<div class="table-wrap">
+    <QuickGrid @ref="grid" ItemsProvider="provider" Pagination="pagination" Class="table grid" ItemKey="@(f => f.Id)">
+        <TemplateColumn Title="Prioridad">
+            <Badges Priority="context.Priority" />
+        </TemplateColumn>
+        <TemplateColumn Title="Vulnerabilidad">
+            <a href="/findings/@context.Id">@(context.CveId ?? context.VulnerabilityId)</a>
+            <div class="muted small ellipsis" title="@context.Summary">@context.Summary</div>
+        </TemplateColumn>
+        <TemplateColumn Title="Componente">
+            <code class="small">@context.ComponentName@@@context.ComponentVersion</code>
+            @if (ProjectId is null)
+            {
+                <div class="muted small">@context.ProjectName</div>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Señales">
+            <Badges Severity="context.Severity" Kev="context.InKev" Ransomware="context.KnownRansomware" Forensic="@(context.ForensicTriageRequired && context.Status == FindingStatus.New)" />
+        </TemplateColumn>
+        <TemplateColumn Title="CVSS" Class="num">@Number(context.CvssScore)</TemplateColumn>
+        <TemplateColumn Title="EPSS (pct.)" Class="num">@Percent(context.EpssPercentile)</TemplateColumn>
+        <TemplateColumn Title="Parche">
+            @if (context.FixAvailable)
+            {
+                <span class="fix">@(context.SuggestedFixVersion ?? "sí")</span>
+            }
+            else
+            {
+                <span class="muted">sin parche</span>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="SLA">
+            <SlaCounter DueAt="context.SlaDueAt" DaysRemaining="context.SlaDaysRemaining" Overdue="context.Overdue" Open="@(context.Status == FindingStatus.New)" />
+        </TemplateColumn>
+        <TemplateColumn Title="Estado">
+            <Badges Status="context.Status" />
+        </TemplateColumn>
+    </QuickGrid>
+</div>
+<Paginator State="pagination" />
+
+@code {
+    [Parameter] public Guid? ProjectId { get; set; }
+
+    [Parameter] public string? InitialStatus { get; set; }
+
+    [Parameter] public string? InitialPriority { get; set; }
+
+    [Parameter] public bool? InitialKev { get; set; }
+
+    [Parameter] public bool InitialOverdue { get; set; }
+
+    private QuickGrid<FindingListItemDto>? grid;
+    private readonly PaginationState pagination = new() { ItemsPerPage = 25 };
+    private GridItemsProvider<FindingListItemDto> provider = default!;
+
+    private string status = string.Empty;
+    private string priority = string.Empty;
+    private string severity = string.Empty;
+    private string kev = string.Empty;
+    private bool overdue;
+    private bool fixAvailable;
+    private string? search;
+    private FindingSort sort = FindingSort.Priority;
+
+    protected override void OnInitialized()
+    {
+        status = Enum.TryParse<FindingStatus>(Normalize(InitialStatus), true, out var s) ? s.ToString() : string.Empty;
+        priority = Enum.TryParse<PriorityLevel>(InitialPriority, true, out var p) ? p.ToString() : string.Empty;
+        kev = InitialKev is { } k ? k.ToString().ToLowerInvariant() : string.Empty;
+        overdue = InitialOverdue;
+
+        provider = async request =>
+        {
+            var actor = await ActorAsync();
+            var query = BuildQuery();
+            query.PageSize = pagination.ItemsPerPage;
+            query.Page = (request.StartIndex / pagination.ItemsPerPage) + 1;
+            PagedResult<FindingListItemDto>? result = null;
+            await TryAsync(async () => result = await Ui.RunAsync<FindingService, PagedResult<FindingListItemDto>>(svc => svc.QueryAsync(actor, query, request.CancellationToken)));
+            return result is null
+                ? GridItemsProviderResult.From(Array.Empty<FindingListItemDto>(), 0)
+                : GridItemsProviderResult.From(result.Items.ToArray(), result.Total);
+        };
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (grid is not null)
+        {
+            await pagination.SetCurrentPageIndexAsync(0);
+            await grid.RefreshDataAsync();
+        }
+    }
+
+    private FindingQuery BuildQuery() => new()
+    {
+        ProjectId = ProjectId,
+        Statuses = Enum.TryParse<FindingStatus>(status, out var s) ? [s] : null,
+        Priorities = Enum.TryParse<PriorityLevel>(priority, out var p) ? [p] : null,
+        Severities = Enum.TryParse<Severity>(severity, out var sv) ? [sv] : null,
+        InKev = bool.TryParse(kev, out var k) ? k : null,
+        Overdue = overdue ? true : null,
+        FixAvailable = fixAvailable ? true : null,
+        Search = string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+        Sort = sort,
+    };
+
+    private string CsvUrl
+    {
+        get
+        {
+            var q = BuildQuery();
+            var parts = new List<string> { $"sort={q.Sort}" };
+            if (q.ProjectId is { } id) parts.Add($"projectId={id}");
+            if (q.Statuses?.FirstOrDefault() is { } st) parts.Add($"status={st}");
+            if (q.Priorities?.FirstOrDefault() is { } pr) parts.Add($"priority={pr}");
+            if (q.Severities?.FirstOrDefault() is { } se) parts.Add($"severity={se}");
+            if (q.InKev is { } kv) parts.Add($"inKev={kv.ToString().ToLowerInvariant()}");
+            if (q.Overdue is true) parts.Add("overdue=true");
+            if (q.FixAvailable is true) parts.Add("fixAvailable=true");
+            if (q.Search is { } text) parts.Add($"search={Uri.EscapeDataString(text)}");
+            return "/api/findings/export.csv?" + string.Join('&', parts);
+        }
+    }
+
+    private static string? Normalize(string? value) => value?.Replace("_", string.Empty, StringComparison.Ordinal);
+}

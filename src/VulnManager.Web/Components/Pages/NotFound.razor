@@ -1,5 +1,12 @@
-﻿@page "/not-found"
+@page "/not-found"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
 @layout MainLayout
 
-<h3>Not Found</h3>
-<p>Sorry, the content you are looking for does not exist.</p>
+<PageTitle>No encontrado · vuln-manager</PageTitle>
+
+<section class="card">
+    <h1>Página no encontrada</h1>
+    <p>El recurso no existe o no tienes acceso a él.</p>
+    <a class="btn" href="/">Volver al tablero</a>
+</section>

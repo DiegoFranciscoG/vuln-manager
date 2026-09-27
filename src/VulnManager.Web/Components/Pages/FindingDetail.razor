@@ -1,0 +1,217 @@
+@page "/findings/{Id:guid}"
+@inherits AppComponentBase
+
+<PageTitle>@(finding?.Summary.CveId ?? finding?.Summary.VulnerabilityId ?? "Hallazgo") · vuln-manager</PageTitle>
+
+<Messages Error="@ErrorMessage" Success="@SuccessMessage" />
+
+@if (finding is null)
+{
+    <p class="muted">Cargando…</p>
+}
+else
+{
+    var s = finding.Summary;
+    <div class="page-header">
+        <div>
+            <p class="muted small"><a href="/projects/@s.ProjectId">@s.ProjectName</a> / hallazgo</p>
+            <h1>@(s.CveId ?? s.VulnerabilityId) <Badges Priority="s.Priority" /></h1>
+            <p>@s.Summary</p>
+            <p>
+                <code>@s.ComponentPurl</code>
+                <Badges Severity="s.Severity" Kev="s.InKev" Ransomware="s.KnownRansomware" Forensic="@(s.ForensicTriageRequired && s.Status == FindingStatus.New)" Status="s.Status" />
+            </p>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <section class="card">
+            <h2>¿Por qué @s.Priority?</h2>
+            @if (finding.PriorityExplanation is { } pe)
+            {
+                <p class="muted small">Regla @pe.MatchedRule de la tabla v@(pe.RuleVersion). Las señales se evalúan por separado; EPSS nunca se multiplica por CVSS (guía de FIRST).</p>
+                <ul class="reasons">
+                    @foreach (var reason in pe.Reasons)
+                    {
+                        <li>@reason</li>
+                    }
+                </ul>
+                <table class="table compact">
+                    <tbody>
+                        <tr><th>Explotación</th><td>@Labels.Of(pe.Inputs.Exploitation) @(pe.Inputs.ExploitationSources.Count > 0 ? $"({string.Join(", ", pe.Inputs.ExploitationSources)})" : "")</td></tr>
+                        <tr><th>Impacto</th><td>@(pe.Inputs.Impact == ImpactSignal.High ? "Alto" : "Limitado") · CVSS @Number(pe.Inputs.CvssScore) @(pe.Inputs.CvssVersion is null ? "" : $"v{pe.Inputs.CvssVersion}")</td></tr>
+                        <tr><th>EPSS percentil</th><td>@Percent(pe.Inputs.EpssPercentile) (umbral @Percent(pe.Inputs.EpssThreshold))</td></tr>
+                        <tr><th>Exposición</th><td>@Labels.Of(pe.Inputs.Exposure)</td></tr>
+                        <tr><th>Parche</th><td>@(pe.Inputs.FixAvailable ? $"Sí{(pe.Inputs.SuggestedFixVersion is null ? "" : $" → {pe.Inputs.SuggestedFixVersion}")}" : "No publicado")</td></tr>
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="card">
+            <h2>Plazo de remediación</h2>
+            <p><SlaCounter DueAt="s.SlaDueAt" DaysRemaining="s.SlaDaysRemaining" Overdue="s.Overdue" Open="@(s.Status == FindingStatus.New)" /></p>
+            @if (finding.SlaExplanation is { } se)
+            {
+                @if (se.Policy == SlaPolicyType.Bod2604)
+                {
+                    <p class="muted small">CISA BOD 26-04, Tabla 1, fila @se.Row: @(se.Days is null ? "remediar en la próxima actualización mayor" : $"{se.Days} días calendario")@(se.ForensicTriage ? " y triage forense" : "").</p>
+                    <table class="table compact">
+                        <tbody>
+                            <tr><th>Expuesto públicamente</th><td>@(se.PubliclyExposed ? "Sí" : "No")</td></tr>
+                            <tr><th>En KEV</th><td>@(se.InKev ? "Sí" : "No")</td></tr>
+                            <tr><th>Automatizable</th><td>@(se.Automatable == true ? "Sí" : "No") <span class="muted small">(@Labels.Of(se.AutomatableSource))</span></td></tr>
+                            <tr><th>Impacto técnico</th><td>@(se.TechnicalImpact == TechnicalImpact.Total ? "Total" : "Parcial") <span class="muted small">(@Labels.Of(se.TechnicalImpactSource))</span></td></tr>
+                            <tr><th>Inicio del plazo</th><td>@Day(se.StartedAt) (@(se.StartBasis == SlaCalculator.StartBasisKev ? "alta en KEV" : "detección"))</td></tr>
+                            <tr><th>Vence</th><td>@Date(se.DueAt)</td></tr>
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="muted small">Política por severidad: @(se.Days?.ToString(CultureInfo.InvariantCulture) ?? "—") días desde @Day(se.StartedAt).</p>
+                }
+            }
+        </section>
+
+        <section class="card">
+            <h2>Señales de las fuentes</h2>
+            <table class="table compact">
+                <tbody>
+                    <tr><th>ID OSV</th><td><a href="https://osv.dev/vulnerability/@s.VulnerabilityId" target="_blank" rel="noopener noreferrer">@s.VulnerabilityId</a></td></tr>
+                    <tr><th>Alias</th><td>@string.Join(", ", finding.Aliases)</td></tr>
+                    <tr><th>CVSS</th><td>@Number(s.CvssScore) <code class="small">@finding.CvssVector</code> <span class="muted small">@finding.CvssSource</span></td></tr>
+                    <tr><th>EPSS</th><td>@Percent(s.EpssScore) de probabilidad en 30 días · percentil @Percent(s.EpssPercentile) <span class="muted small">(@(finding.EpssDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "sin dato"))</span></td></tr>
+                    <tr><th>KEV (CISA)</th><td>@(finding.KevDateAdded is null ? "No" : $"Sí, desde {finding.KevDateAdded:yyyy-MM-dd}")</td></tr>
+                    @if (finding.KevRequiredAction is not null)
+                    {
+                        <tr><th>Acción requerida</th><td class="small">@finding.KevRequiredAction</td></tr>
+                    }
+                    <tr><th>SSVC (CISA)</th><td>Explotación: @(finding.SsvcExploitation?.ToString() ?? "—") · Automatizable: @(finding.SsvcAutomatable is null ? "—" : finding.SsvcAutomatable.Value ? "sí" : "no") · Impacto: @(finding.SsvcTechnicalImpact?.ToString() ?? "—")</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>Corrección</h2>
+            @if (s.FixAvailable)
+            {
+                <p>Actualizar a <strong>@(s.SuggestedFixVersion ?? finding.FixedVersions.FirstOrDefault())</strong>.</p>
+                <p class="muted small">Versiones corregidas publicadas: @string.Join(", ", finding.FixedVersions)</p>
+            }
+            else
+            {
+                <p>No hay versión corregida publicada: mitiga (control compensatorio), acepta el riesgo con fecha de expiración o registra una declaración VEX si no te afecta.</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(finding.Details))
+            {
+                <details>
+                    <summary>Descripción del aviso</summary>
+                    <pre class="details">@finding.Details</pre>
+                </details>
+            }
+        </section>
+    </div>
+
+    <div class="grid-2">
+        <section class="card">
+            <h2>Cambiar estado</h2>
+            <AuthorizeView Policy="@AppPolicies.CanTriage" Context="triageAuth">
+                <Authorized>
+                    @if (s.Status == FindingStatus.NotAffected || s.Status == FindingStatus.Fixed)
+                    {
+                        <p class="muted">Estado gestionado por @(s.Status == FindingStatus.Fixed ? "el sistema (SBOM/VEX)" : "una declaración VEX"). @(s.Status == FindingStatus.NotAffected ? "Revoca la declaración en la pestaña VEX del proyecto para reabrirlo." : "")</p>
+                    }
+                    else
+                    {
+                        <EditForm Model="statusForm" OnValidSubmit="ChangeStatusAsync" FormName="status" class="form-grid">
+                            <label>
+                                Nuevo estado
+                                <InputSelect @bind-Value="statusForm.Status">
+                                    @foreach (var option in AllowedTargets(s.Status))
+                                    {
+                                        <option value="@option">@Labels.Of(option)</option>
+                                    }
+                                </InputSelect>
+                            </label>
+                            @if (statusForm.Status == FindingStatus.Accepted)
+                            {
+                                <label>Riesgo aceptado hasta<InputDate @bind-Value="statusForm.RiskAcceptedUntil" /></label>
+                            }
+                            <label class="span-2">Justificación (obligatoria)<InputTextArea @bind-Value="statusForm.Justification" rows="3" maxlength="1000" /></label>
+                            <div><button class="btn btn-primary" type="submit" disabled="@Busy">Guardar</button></div>
+                        </EditForm>
+                        <p class="muted small">Para «No afectado» registra una declaración VEX (con justificación CISA) en la pestaña VEX del proyecto: así sobrevive a futuros SBOM.</p>
+                    }
+                </Authorized>
+                <NotAuthorized>
+                    <p class="muted">Tu rol es de solo lectura.</p>
+                </NotAuthorized>
+            </AuthorizeView>
+            @if (finding.StatusReason is not null)
+            {
+                <p class="muted small">Motivo actual: @finding.StatusReason @(finding.RiskAcceptedUntil is null ? "" : $"(hasta {finding.RiskAcceptedUntil:yyyy-MM-dd})")</p>
+            }
+        </section>
+
+        <section class="card">
+            <h2>Historial</h2>
+            <ol class="timeline">
+                @foreach (var h in finding.History.Reverse())
+                {
+                    <li>
+                        <span class="muted small">@Date(h.ChangedAt) · @Labels.Of(h.Source) · @h.ChangedBy</span>
+                        <div>@(h.From is null ? "Detectado" : Labels.Of(h.From.Value)) → <strong>@Labels.Of(h.To)</strong></div>
+                        @if (h.Justification is not null)
+                        {
+                            <div class="small">@h.Justification</div>
+                        }
+                    </li>
+                }
+            </ol>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private FindingDetailDto? finding;
+    private ChangeFindingStatusRequest statusForm = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var actor = await ActorAsync();
+        await TryAsync(async () => finding = await Ui.RunAsync<FindingService, FindingDetailDto>(s => s.GetAsync(actor, Id)));
+        ResetForm();
+    }
+
+    private void ResetForm()
+    {
+        var current = finding?.Summary.Status ?? FindingStatus.New;
+        statusForm = new ChangeFindingStatusRequest
+        {
+            Status = AllowedTargets(current).FirstOrDefault(),
+            RiskAcceptedUntil = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+        };
+    }
+
+    private static IReadOnlyList<FindingStatus> AllowedTargets(FindingStatus current) => current == FindingStatus.New
+        ? [FindingStatus.Mitigated, FindingStatus.Accepted, FindingStatus.FalsePositive]
+        : [FindingStatus.New];
+
+    private async Task ChangeStatusAsync()
+    {
+        var actor = await ActorAsync();
+        var request = statusForm;
+        if (request.Status != FindingStatus.Accepted)
+        {
+            request.RiskAcceptedUntil = null;
+        }
+
+        if (await TryAsync(async () => finding = await Ui.RunAsync<FindingService, FindingDetailDto>(s => s.ChangeStatusAsync(actor, Id, request)), "Estado actualizado y registrado en el historial."))
+        {
+            ResetForm();
+        }
+    }
+}

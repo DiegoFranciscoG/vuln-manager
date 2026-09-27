@@ -6,10 +6,13 @@ using VulnManager.Domain.Scoring;
 
 namespace VulnManager.Infrastructure.External;
 
-/// <summary>CISA KEV JSON feed with conditional GET (If-None-Match).</summary>
+/// <summary>
+/// CISA KEV JSON feed with conditional GET. The CDN honours If-Modified-Since (304) even when it ignores If-None-Match,
+/// so both validators are sent.
+/// </summary>
 public sealed class KevClient(HttpClient http) : IKevClient
 {
-    public async Task<KevFetchResult> FetchAsync(string? etag, CancellationToken cancellationToken = default)
+    public async Task<KevFetchResult> FetchAsync(string? etag, DateTimeOffset? lastModified, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, string.Empty);
         if (!string.IsNullOrWhiteSpace(etag) && EntityTagHeaderValue.TryParse(etag, out var tag))
@@ -17,10 +20,15 @@ public sealed class KevClient(HttpClient http) : IKevClient
             request.Headers.IfNoneMatch.Add(tag);
         }
 
+        if (lastModified is not null)
+        {
+            request.Headers.IfModifiedSince = lastModified;
+        }
+
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotModified)
         {
-            return new KevFetchResult(true, etag, null, []);
+            return new KevFetchResult(true, etag, lastModified, null, []);
         }
 
         response.EnsureSuccessStatusCode();
@@ -55,7 +63,7 @@ public sealed class KevClient(HttpClient http) : IKevClient
                 item.Arr("cwes").Select(c => c.GetString()).OfType<string>().ToList()));
         }
 
-        return new KevFetchResult(false, response.Headers.ETag?.ToString(), JsonReading.Clip(root.Str("catalogVersion"), 20), entries);
+        return new KevFetchResult(false, response.Headers.ETag?.ToString(), response.Content.Headers.LastModified, JsonReading.Clip(root.Str("catalogVersion"), 20), entries);
     }
 }
 

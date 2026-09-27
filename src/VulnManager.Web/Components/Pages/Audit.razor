@@ -1,0 +1,55 @@
+@page "/audit"
+@attribute [Authorize(Roles = AppRoles.Admin)]
+@inherits AppComponentBase
+
+<PageTitle>Auditoría · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Auditoría</h1>
+        <p class="muted">Registro de solo inserción (un trigger de PostgreSQL impide modificarlo). Guarda identificadores, nunca correos ni secretos; se purga pasados los días de retención configurados (LOPDP art. 10 i).</p>
+    </div>
+</div>
+
+<Messages Error="@ErrorMessage" />
+
+<section class="card">
+    @if (entries is not null)
+    {
+        <table class="table">
+            <thead><tr><th>#</th><th>Fecha</th><th>Actor</th><th>Acción</th><th>Entidad</th><th>Detalle</th></tr></thead>
+            <tbody>
+                @foreach (var e in entries.Items)
+                {
+                    <tr>
+                        <td class="muted">@e.Id</td>
+                        <td>@Date(e.OccurredAt)</td>
+                        <td class="small">@e.ActorType · @e.ActorId</td>
+                        <td>@e.Action</td>
+                        <td class="small">@e.EntityType · @e.EntityId</td>
+                        <td><code class="small">@e.Details</code></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="pager">
+            <button class="btn btn-ghost" disabled="@(currentPage <= 1)" @onclick="() => GoAsync(currentPage - 1)">Anterior</button>
+            <span class="muted">Página @currentPage de @entries.TotalPages</span>
+            <button class="btn btn-ghost" disabled="@(currentPage >= entries.TotalPages)" @onclick="() => GoAsync(currentPage + 1)">Siguiente</button>
+        </div>
+    }
+</section>
+
+@code {
+    private PagedResult<AuditEntryDto>? entries;
+    private int currentPage = 1;
+
+    protected override Task OnInitializedAsync() => GoAsync(1);
+
+    private async Task GoAsync(int target)
+    {
+        currentPage = Math.Max(1, target);
+        var actor = await ActorAsync();
+        await TryAsync(async () => entries = await Ui.RunAsync<AuditService, PagedResult<AuditEntryDto>>(s => s.ListAsync(actor, currentPage, 50)));
+    }
+}

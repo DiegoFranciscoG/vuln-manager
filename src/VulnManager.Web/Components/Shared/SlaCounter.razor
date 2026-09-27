@@ -1,0 +1,26 @@
+@if (!Open)
+{
+    <span class="muted">—</span>
+}
+else if (DueAt is null)
+{
+    <span class="sla sla-upgrade" title="BOD 26-04: remediar en la próxima actualización mayor">Próx. actualización</span>
+}
+else if (Overdue)
+{
+    <span class="sla sla-overdue" title="Venció el @DueAt.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">Vencido hace @(Math.Abs(DaysRemaining ?? 0)) d</span>
+}
+else
+{
+    <span class="sla @(DaysRemaining <= 3 ? "sla-soon" : "sla-ok")" title="Vence el @DueAt.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">Vence en @DaysRemaining d</span>
+}
+
+@code {
+    [Parameter] public DateTimeOffset? DueAt { get; set; }
+
+    [Parameter] public int? DaysRemaining { get; set; }
+
+    [Parameter] public bool Overdue { get; set; }
+
+    [Parameter] public bool Open { get; set; } = true;
+}

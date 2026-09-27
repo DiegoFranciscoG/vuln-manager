@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using VulnManager.Domain.Common;
@@ -12,8 +13,11 @@ using VulnManager.Infrastructure.Persistence.Converters;
 
 namespace VulnManager.Infrastructure.Persistence;
 
-public sealed class VulnManagerDbContext(DbContextOptions<VulnManagerDbContext> options) : IdentityDbContext<AppUser>(options)
+public sealed class VulnManagerDbContext(DbContextOptions<VulnManagerDbContext> options) : IdentityDbContext<AppUser>(options), IDataProtectionKeyContext
 {
+    /// <summary>ASP.NET Core Data Protection keys: cookies and antiforgery tokens survive restarts (Render free sleeps).</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
     public DbSet<Project> Projects => Set<Project>();
 
     public DbSet<ProjectApiKey> ProjectApiKeys => Set<ProjectApiKey>();

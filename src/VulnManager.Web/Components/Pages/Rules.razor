@@ -1,0 +1,150 @@
+@page "/rules"
+@inherits AppComponentBase
+
+<PageTitle>Reglas de prioridad · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Reglas de prioridad y SLA</h1>
+        <p class="muted">Tabla de decisión: gana la primera regla que coincide. Cada cambio crea una versión nueva e inmutable; activarla recalcula todos los hallazgos y queda auditado.</p>
+    </div>
+</div>
+
+<Messages Error="@ErrorMessage" Success="@SuccessMessage" />
+
+@if (active is not null)
+{
+    <section class="card">
+        <h2>Versión activa: v@(active.Version) · @active.Name</h2>
+        <p class="muted small">@active.Notes</p>
+        <div class="grid-3 small">
+            <div><strong>Umbral EPSS:</strong> percentil ≥ @Percent(active.EpssPercentileThreshold)</div>
+            <div><strong>Impacto alto:</strong> CVSS ≥ @Number(active.HighImpactMinCvss)</div>
+            <div><strong>Severidad desconocida:</strong> @(active.UnknownSeverityAs == ImpactSignal.High ? "impacto alto (conservador)" : "impacto limitado")</div>
+            <div><strong>SSVC «active» cuenta como explotada:</strong> @(active.SsvcActiveCountsAsExploited ? "sí" : "no")</div>
+            <div><strong>Política SLA:</strong> @(active.SlaPolicy == SlaPolicyType.Bod2604 ? "CISA BOD 26-04 (Tabla 1)" : "por severidad")</div>
+            <div><strong>Fix on system upgrade:</strong> @(active.FixOnUpgradeDays is null ? "sin fecha fija" : $"{active.FixOnUpgradeDays} días")</div>
+        </div>
+        <table class="table">
+            <thead><tr><th>Regla</th><th>Explotación</th><th>Impacto</th><th>Exposición</th><th>Nivel</th><th>Explicación</th></tr></thead>
+            <tbody>
+                @foreach (var r in active.Rules)
+                {
+                    <tr>
+                        <td>@r.Id</td>
+                        <td>@List(r.When.Exploitation)</td>
+                        <td>@List(r.When.Impact)</td>
+                        <td>@List(r.When.Exposure)</td>
+                        <td><Badges Priority="r.Level" /></td>
+                        <td>@r.Reason</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+
+    <AuthorizeView Roles="@AppRoles.Admin" Context="adminAuth">
+        <section class="card">
+            <h2>Crear nueva versión</h2>
+            <p class="muted small">Parte de la versión activa. Para editar la lista de reglas usa <code>POST /api/priority-rules</code> (se valida que cubra las 12 combinaciones).</p>
+            <EditForm Model="form" OnValidSubmit="CreateAsync" FormName="rule" class="form-grid">
+                <DataAnnotationsValidator />
+                <label>Nombre<InputText @bind-Value="form.Name" /></label>
+                <label>Notas<InputText @bind-Value="form.Notes" /></label>
+                <label>Umbral de percentil EPSS (0–1)<InputNumber @bind-Value="form.EpssPercentileThreshold" step="0.01" /></label>
+                <label>CVSS mínimo para impacto alto<InputNumber @bind-Value="form.HighImpactMinCvss" step="0.1" /></label>
+                <label>
+                    Política SLA
+                    <InputSelect @bind-Value="form.SlaPolicy">
+                        <option value="@SlaPolicyType.Bod2604">CISA BOD 26-04</option>
+                        <option value="@SlaPolicyType.Severity">Por severidad (15/30/90/180 días)</option>
+                    </InputSelect>
+                </label>
+                <label>Días para «Fix on system upgrade» (vacío = sin fecha)<InputNumber @bind-Value="form.FixOnUpgradeDays" /></label>
+                <label class="check"><InputCheckbox @bind-Value="form.SsvcActiveCountsAsExploited" /> SSVC «active» cuenta como explotación confirmada</label>
+                <label class="check"><InputCheckbox @bind-Value="form.Activate" /> Activar al crear</label>
+                <ValidationSummary />
+                <div><button type="submit" class="btn btn-primary" disabled="@Busy">Crear versión</button></div>
+            </EditForm>
+        </section>
+    </AuthorizeView>
+}
+
+<section class="card">
+    <h2>Versiones</h2>
+    <table class="table">
+        <thead><tr><th>Versión</th><th>Nombre</th><th>Creada</th><th>Por</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var v in versions)
+            {
+                <tr>
+                    <td>v@(v.Version)</td>
+                    <td>@v.Name</td>
+                    <td>@Date(v.CreatedAt)</td>
+                    <td class="small">@v.CreatedBy</td>
+                    <td>@(v.IsActive ? "activa" : "")</td>
+                    <td>
+                        @if (!v.IsActive)
+                        {
+                            <AuthorizeView Roles="@AppRoles.Admin">
+                                <button class="btn btn-ghost small" @onclick="() => ActivateAsync(v.Id)">Activar</button>
+                            </AuthorizeView>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@code {
+    private PriorityRuleDto? active;
+    private IReadOnlyList<PriorityRuleDto> versions = [];
+    private CreatePriorityRuleRequest form = new();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        await TryAsync(async () =>
+        {
+            active = await Ui.RunAsync<PriorityRuleService, PriorityRuleDto>(s => s.GetActiveAsync());
+            versions = await Ui.RunAsync<PriorityRuleService, IReadOnlyList<PriorityRuleDto>>(s => s.ListAsync());
+        });
+        if (active is not null)
+        {
+            form = new CreatePriorityRuleRequest
+            {
+                Name = $"Versión {versions.Max(v => v.Version) + 1}",
+                EpssPercentileThreshold = active.EpssPercentileThreshold,
+                HighImpactMinCvss = active.HighImpactMinCvss,
+                UnknownSeverityAs = active.UnknownSeverityAs,
+                SsvcActiveCountsAsExploited = active.SsvcActiveCountsAsExploited,
+                Rules = active.Rules.ToList(),
+                SlaPolicy = active.SlaPolicy,
+                SlaSeverityDays = active.SlaSeverityDays.ToDictionary(k => k.Key, k => k.Value),
+                FixOnUpgradeDays = active.FixOnUpgradeDays,
+            };
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        var actor = await ActorAsync();
+        if (await TryAsync(() => Ui.RunAsync<PriorityRuleService, PriorityRuleDto>(s => s.CreateAsync(actor, form)), form.Activate ? "Versión creada y activada; hallazgos recalculados." : "Versión creada."))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task ActivateAsync(Guid id)
+    {
+        var actor = await ActorAsync();
+        if (await TryAsync(() => Ui.RunAsync<PriorityRuleService, ReconciliationResult>(s => s.ActivateAsync(actor, id)), "Versión activada; hallazgos recalculados."))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private static string List<T>(IReadOnlyList<T>? values) => values is null ? "cualquiera" : string.Join(", ", values);
+}

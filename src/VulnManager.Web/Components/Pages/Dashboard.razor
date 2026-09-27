@@ -1,0 +1,110 @@
+@page "/"
+@inherits AppComponentBase
+
+<PageTitle>Tablero · vuln-manager</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Tablero</h1>
+        <p class="muted">Hallazgos abiertos priorizados por explotación real (KEV/SSVC, EPSS), impacto y exposición. Plazos según la BOD 26-04 de CISA.</p>
+    </div>
+    <AuthorizeView Roles="@AppRoles.Admin">
+        <a class="btn btn-primary" href="/projects/new">Nuevo proyecto</a>
+    </AuthorizeView>
+</div>
+
+<Messages Error="@ErrorMessage" />
+
+@if (dashboard is null)
+{
+    <p class="muted">Cargando…</p>
+}
+else
+{
+    <div class="kpis">
+        <a class="kpi" href="/findings?status=NEW"><span class="kpi-value">@dashboard.OpenFindings</span><span class="kpi-label">Abiertos</span></a>
+        <a class="kpi kpi-p1" href="/findings?priority=P1"><span class="kpi-value">@dashboard.P1</span><span class="kpi-label">Prioridad P1</span></a>
+        <a class="kpi kpi-overdue" href="/findings?overdue=true"><span class="kpi-value">@dashboard.Overdue</span><span class="kpi-label">SLA vencido</span></a>
+        <a class="kpi kpi-kev" href="/findings?kev=true"><span class="kpi-value">@dashboard.InKev</span><span class="kpi-label">En KEV</span></a>
+        <div class="kpi"><span class="kpi-value">@dashboard.ForensicTriage</span><span class="kpi-label">Triage forense</span></div>
+        <a class="kpi" href="/alerts"><span class="kpi-value">@dashboard.OpenAlerts</span><span class="kpi-label">Alertas abiertas</span></a>
+    </div>
+
+    <section class="card">
+        <h2>Proyectos</h2>
+        @if (dashboard.Projects.Count == 0)
+        {
+            <p class="muted">Aún no hay proyectos. Un administrador puede crear uno y cargar su SBOM CycloneDX.</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Proyecto</th>
+                            <th>Exposición</th>
+                            <th class="num">P1</th>
+                            <th class="num">P2</th>
+                            <th class="num">P3</th>
+                            <th class="num">P4</th>
+                            <th class="num">Vencidos</th>
+                            <th class="num">KEV</th>
+                            <th class="num">Cerrados</th>
+                            <th>Último SBOM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in dashboard.Projects)
+                        {
+                            <tr>
+                                <td><a href="/projects/@item.Project.Id">@item.Project.Name</a></td>
+                                <td><span class="badge @(item.Project.Exposure == Exposure.Public ? "exposure-public" : "exposure-internal")">@Labels.Of(item.Project.Exposure)</span></td>
+                                <td class="num"><span class="count p1">@item.Stats.P1</span></td>
+                                <td class="num"><span class="count p2">@item.Stats.P2</span></td>
+                                <td class="num">@item.Stats.P3</td>
+                                <td class="num">@item.Stats.P4</td>
+                                <td class="num">@(item.Stats.Overdue > 0 ? item.Stats.Overdue.ToString(CultureInfo.InvariantCulture) : "—")</td>
+                                <td class="num">@item.Stats.InKev</td>
+                                <td class="num muted">@item.Stats.Closed</td>
+                                <td>@Date(item.LastImportAt)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <h2>Estado de las fuentes</h2>
+        <div class="sources">
+            @foreach (var source in Enum.GetValues<SyncSource>())
+            {
+                var run = dashboard.LatestSyncs.FirstOrDefault(r => r.Source == source);
+                <div class="source">
+                    <strong>@source.ToString().ToUpperInvariant()</strong>
+                    @if (run is null)
+                    {
+                        <span class="muted">sin ejecuciones</span>
+                    }
+                    else
+                    {
+                        <span class="badge sync-@run.Status.ToString().ToLowerInvariant()">@run.Status</span>
+                        <span class="muted small">@Date(run.FinishedAt ?? run.StartedAt)</span>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private DashboardDto? dashboard;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var actor = await ActorAsync();
+        await TryAsync(async () => dashboard = await Ui.RunAsync<DashboardService, DashboardDto>(s => s.GetAsync(actor)));
+    }
+}

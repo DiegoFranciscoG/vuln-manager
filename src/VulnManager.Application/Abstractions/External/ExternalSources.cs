@@ -46,12 +46,12 @@ public sealed record KevCatalogEntry(
     bool? ForensicTriage,
     IReadOnlyList<string> Cwes);
 
-public sealed record KevFetchResult(bool NotModified, string? ETag, string? CatalogVersion, IReadOnlyList<KevCatalogEntry> Entries);
+public sealed record KevFetchResult(bool NotModified, string? ETag, DateTimeOffset? LastModified, string? CatalogVersion, IReadOnlyList<KevCatalogEntry> Entries);
 
-/// <summary>CISA KEV JSON feed, fetched with a conditional GET.</summary>
+/// <summary>CISA KEV JSON feed, fetched with a conditional GET (If-None-Match and If-Modified-Since).</summary>
 public interface IKevClient
 {
-    Task<KevFetchResult> FetchAsync(string? etag, CancellationToken cancellationToken = default);
+    Task<KevFetchResult> FetchAsync(string? etag, DateTimeOffset? lastModified, CancellationToken cancellationToken = default);
 }
 
 public sealed record EpssScore(string CveId, decimal Epss, decimal Percentile, DateOnly Date);

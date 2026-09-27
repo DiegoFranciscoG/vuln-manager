@@ -1,0 +1,39 @@
+@* Small visual primitives shared by the pages. *@
+@if (Priority is { } level)
+{
+    <span class="badge @Labels.CssOf(level)" title="Prioridad @level">@level</span>
+}
+@if (Severity is { } severity)
+{
+    <span class="badge @Labels.CssOf(severity)">@Labels.Of(severity)</span>
+}
+@if (Status is { } status)
+{
+    <span class="badge status status-@status.ToString().ToLowerInvariant()">@Labels.Of(status)</span>
+}
+@if (Kev)
+{
+    <span class="badge kev" title="En el catálogo KEV de CISA (explotación activa)">KEV</span>
+}
+@if (Ransomware)
+{
+    <span class="badge ransomware" title="Usada en campañas de ransomware (KEV)">Ransomware</span>
+}
+@if (Forensic)
+{
+    <span class="badge forensic" title="BOD 26-04: remediar en 3 días y hacer triage forense">Triage forense</span>
+}
+
+@code {
+    [Parameter] public PriorityLevel? Priority { get; set; }
+
+    [Parameter] public Severity? Severity { get; set; }
+
+    [Parameter] public FindingStatus? Status { get; set; }
+
+    [Parameter] public bool Kev { get; set; }
+
+    [Parameter] public bool Ransomware { get; set; }
+
+    [Parameter] public bool Forensic { get; set; }
+}

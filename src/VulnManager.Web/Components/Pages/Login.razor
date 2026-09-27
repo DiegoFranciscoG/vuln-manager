@@ -1,0 +1,84 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting(VulnManager.Web.Security.RateLimitPolicies.Login)]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using VulnManager.Infrastructure.Identity
+@inject SignInManager<AppUser> SignIn
+@inject NavigationManager Navigation
+
+<PageTitle>Iniciar sesión · vuln-manager</PageTitle>
+
+<section class="login">
+    <div class="card login-card">
+        <h1>vuln-manager</h1>
+        <p class="muted">Gestión y priorización de vulnerabilidades a partir de SBOM.</p>
+
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="alert alert-error" role="alert">@error</div>
+        }
+
+        <EditForm Model="Input!" method="post" OnValidSubmit="LoginAsync" FormName="login" Enhance="false">
+            <DataAnnotationsValidator />
+            <label>
+                Correo
+                <InputText @bind-Value="Input!.Email" autocomplete="username" type="email" />
+            </label>
+            <ValidationMessage For="() => Input!.Email" />
+            <label>
+                Contraseña
+                <InputText @bind-Value="Input!.Password" autocomplete="current-password" type="password" />
+            </label>
+            <ValidationMessage For="() => Input!.Password" />
+            <button type="submit" class="btn btn-primary">Entrar</button>
+        </EditForm>
+        <p class="muted small">Las cuentas las crea un administrador. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.</p>
+    </div>
+</section>
+
+@code {
+    private string? error;
+
+    [SupplyParameterFromForm]
+    private LoginInput? Input { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized() => Input ??= new LoginInput();
+
+    private async Task LoginAsync()
+    {
+        Input ??= new LoginInput();
+        var result = await SignIn.PasswordSignInAsync(Input.Email, Input.Password, isPersistent: false, lockoutOnFailure: true);
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo(SafeReturnUrl(ReturnUrl), forceLoad: true);
+            return;
+        }
+
+        error = result.IsLockedOut
+            ? "Cuenta bloqueada temporalmente por intentos fallidos. Espera 15 minutos."
+            : "Correo o contraseña incorrectos.";
+    }
+
+    /// <summary>Only local paths are accepted as return URLs (no open redirects).</summary>
+    private static string SafeReturnUrl(string? returnUrl) =>
+        !string.IsNullOrEmpty(returnUrl) && Uri.TryCreate("/" + returnUrl.TrimStart('/'), UriKind.Relative, out _) && !returnUrl.Contains("//", StringComparison.Ordinal) && !returnUrl.Contains('\\', StringComparison.Ordinal)
+            ? "/" + returnUrl.TrimStart('/')
+            : "/";
+
+    private sealed class LoginInput
+    {
+        [Required(ErrorMessage = "Escribe tu correo.")]
+        [EmailAddress(ErrorMessage = "Correo inválido.")]
+        [StringLength(256)]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Escribe tu contraseña.")]
+        [StringLength(128)]
+        public string Password { get; set; } = string.Empty;
+    }
+}

@@ -28,8 +28,9 @@ internal sealed class FindingConfiguration : IEntityTypeConfiguration<Finding>
         builder.HasIndex(f => f.SlaDueAt).HasFilter("status = 'NEW'");
         builder.HasIndex(f => f.VulnerabilityId);
         builder.Property(f => f.StatusReason).HasMaxLength(FindingTransitions.MaxJustificationLength);
-        builder.Property(f => f.PriorityExplanation).HasColumnType("jsonb").IsRequired();
-        builder.Property(f => f.SlaExplanation).HasColumnType("jsonb").IsRequired();
+        // "json" (not jsonb) keeps the exact text, so an unchanged explanation compares equal and is not rewritten.
+        builder.Property(f => f.PriorityExplanation).HasColumnType("json").IsRequired();
+        builder.Property(f => f.SlaExplanation).HasColumnType("json").IsRequired();
         builder.Property(f => f.Version).IsRowVersion();
         builder.HasOne<Project>().WithMany().HasForeignKey(f => f.ProjectId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Component>().WithMany().HasForeignKey(f => f.ComponentId).OnDelete(DeleteBehavior.Restrict);
