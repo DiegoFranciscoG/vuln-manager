@@ -1,0 +1,33 @@
+name: Migraciones de base de datos (manual)
+
+# Alternativa a migrar al arrancar: genera un migration bundle y lo aplica con una identidad de despliegue
+# distinta a la de la aplicación (recomendación de Microsoft para EF Core).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Aplicar migraciones con efbundle
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Generar bundle
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+        run: |
+          dotnet tool restore
+          dotnet ef migrations bundle -p src/VulnManager.Infrastructure -s src/VulnManager.Infrastructure --self-contained -r linux-x64 -o efbundle
+      - name: Aplicar
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          DEPLOY_DB_CONNECTION: ${{ secrets.DEPLOY_DB_CONNECTION }}
+        run: ./efbundle --connection "$DEPLOY_DB_CONNECTION"
