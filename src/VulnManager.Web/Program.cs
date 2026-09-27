@@ -42,7 +42,7 @@ builder.Services
 builder.Services.Configure<SyncTriggerOptions>(builder.Configuration.GetSection(SyncTriggerOptions.Section));
 builder.Services.AddDataProtection().PersistKeysToDbContext<VulnManagerDbContext>().SetApplicationName("vuln-manager");
 
-builder.Services.AddControllers().AddJsonOptions(options =>
+builder.Services.AddControllers(options => options.ModelBinderProviders.Insert(0, new UpperSnakeEnumModelBinderProvider())).AddJsonOptions(options =>
 {
     var shared = AppJson.Options;
     options.JsonSerializerOptions.DefaultIgnoreCondition = shared.DefaultIgnoreCondition;
@@ -83,6 +83,9 @@ if (app.Configuration.GetValue("ForwardedHeaders:Enabled", false))
     app.UseForwardedHeaders();
 }
 
+// Request logging wraps the exception handler so it records the final status (a 400 from a rule violation
+// is logged as 400, not as a 500 with a stack trace); real 5xx errors are logged by GlobalExceptionHandler.
+app.UseSerilogRequestLogging();
 app.UseExceptionHandler("/Error", createScopeForErrors: true);
 if (!app.Environment.IsDevelopment())
 {
@@ -90,7 +93,6 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
-app.UseSerilogRequestLogging();
 // Friendly status pages only for the UI; API clients get the raw status code (401/403/404/429).
 app.UseWhen(
     context => !context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase),

@@ -119,6 +119,25 @@ public class VexAndTriageTests(PostgresContainer postgres, ExternalApisStub apis
     }
 
     [Fact]
+    public async Task Finding_filters_accept_the_enum_names_of_the_json_contract()
+    {
+        var project = await ProjectWithLog4jFindingsAsync();
+        (await Admin.PostAsJsonAsync($"/api/projects/{project.Id}/vex-statements", new CreateVexStatementRequest
+        {
+            VulnerabilityRef = "CVE-2021-45046",
+            Status = VexStatus.NotAffected,
+            Justification = "vulnerable_code_not_in_execute_path",
+        }, AppJson.Options, Ct)).EnsureSuccessStatusCode();
+
+        var filtered = await Admin.GetAsync($"/api/findings?projectId={project.Id}&status=NOT_AFFECTED&status=FALSE_POSITIVE&sort=SLA_DUE", Ct);
+
+        filtered.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadAsync<PagedResult<FindingListItemDto>>(filtered)).Items.Should().ContainSingle(f => f.CveId == "CVE-2021-45046");
+        (await Admin.GetAsync($"/api/findings?projectId={project.Id}&status=4", Ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Admin.GetAsync($"/api/findings?projectId={project.Id}&status=NEW,FIXED", Ct)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Non_exhaustive_rule_sets_are_rejected()
     {
         var response = await Admin.PostAsJsonAsync("/api/priority-rules", new CreatePriorityRuleRequest
