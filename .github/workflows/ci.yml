@@ -80,6 +80,12 @@ jobs:
           persist-credentials: false
       - name: Construir imagen
         run: docker build -t vuln-manager:ci .
+      - name: La imagen publica el script de Blazor (static web assets)
+        run: |
+          id=$(docker create vuln-manager:ci)
+          docker cp "$id:/app/VulnManager.Web.staticwebassets.endpoints.json" endpoints.json
+          docker rm "$id"
+          grep -q '"Route":"_framework/blazor.web.js"' endpoints.json
       - name: Trivy (imagen oficial fijada) sobre la imagen
         # SeedData contiene SBOM de demostración con vulnerabilidades intencionales: no son dependencias de la app.
         run: >-

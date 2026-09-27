@@ -6,6 +6,9 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
     <UserSecretsId>vuln-manager-web</UserSecretsId>
+    <!-- The SDK only infers this from .razor files present at restore time; the Dockerfile restores from the .csproj
+         alone (layer cache), so it is declared explicitly or the image ships without _framework/blazor.web.js. -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>
