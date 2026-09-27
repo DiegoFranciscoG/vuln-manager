@@ -6,15 +6,26 @@ using VulnManager.Domain.Entities;
 
 namespace VulnManager.Infrastructure.Notifications;
 
-public sealed class AlertWebhookOptions
+public sealed class AlertWebhookOptions : IValidatableObject
 {
     public const string Section = "AlertWebhook";
 
     /// <summary>HTTPS incoming-webhook URL (Slack, Discord, Teams...). Configured only by environment: it is a secret and avoids SSRF.</summary>
-    [Url]
     public string? Url { get; set; }
 
     public string? PublicBaseUrl { get; set; }
+
+    /// <summary>Empty disables the webhook; any other value must be an absolute https URL (fail fast on typos).</summary>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        foreach (var (name, value) in new[] { (nameof(Url), Url), (nameof(PublicBaseUrl), PublicBaseUrl) })
+        {
+            if (!string.IsNullOrWhiteSpace(value) && (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
+            {
+                yield return new ValidationResult($"AlertWebhook:{name} debe ser una URL https absoluta.", [name]);
+            }
+        }
+    }
 }
 
 /// <summary>Posts alerts as {"text", "content"} so the same payload works with Slack and Discord incoming webhooks.</summary>

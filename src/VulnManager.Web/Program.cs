@@ -8,12 +8,18 @@ using VulnManager.Application;
 using VulnManager.Application.Common;
 using VulnManager.Infrastructure;
 using VulnManager.Infrastructure.Persistence;
+using VulnManager.Web;
 using VulnManager.Web.Components;
 using VulnManager.Web.Controllers;
 using VulnManager.Web.ErrorHandling;
 using VulnManager.Web.OpenApi;
 using VulnManager.Web.Security;
 using VulnManager.Web.Seeding;
+
+if (args is [HealthProbe.Argument, ..])
+{
+    return await HealthProbe.RunAsync();
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -117,6 +123,7 @@ app.MapPost("/logout", async (Microsoft.AspNetCore.Identity.SignInManager<VulnMa
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 await app.RunAsync();
+return 0;
 
 /// <summary>Entry point, exposed for WebApplicationFactory in the integration tests.</summary>
 public partial class Program;

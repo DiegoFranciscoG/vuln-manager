@@ -32,6 +32,10 @@ public static class DependencyInjection
             throw new InvalidOperationException("Define ConnectionStrings__Default (environment variable). There is no default value on purpose.");
         }
 
+        // Kerberos/GSS is never used (Neon and local use password + TLS); disabling it avoids probing for libgssapi,
+        // which the chiseled runtime image does not ship.
+        connectionString = new Npgsql.NpgsqlConnectionStringBuilder(connectionString) { GssEncryptionMode = Npgsql.GssEncryptionMode.Disable }.ConnectionString;
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddDbContext<VulnManagerDbContext>(options => options
             .UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3))
