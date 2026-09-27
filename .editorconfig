@@ -16,3 +16,7 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
+
+# EF Core migrations are generated code.
+[**/Migrations/*.cs]
+generated_code = true
