@@ -105,14 +105,22 @@ public static class SecurityServiceCollectionExtensions
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.OnRejected = (context, _) =>
+            options.OnRejected = async (context, cancellationToken) =>
             {
+                var response = context.HttpContext.Response;
+                var seconds = 60;
                 if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
                 {
-                    context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString(NumberFormatInfo.InvariantInfo);
+                    seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+                    response.Headers.RetryAfter = seconds.ToString(NumberFormatInfo.InvariantInfo);
                 }
 
-                return ValueTask.CompletedTask;
+                // Browsers get their own page: re-executing the status page would bounce through the login redirect in a loop.
+                if (!context.HttpContext.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+                {
+                    response.ContentType = "text/html; charset=utf-8";
+                    await response.WriteAsync(TooManyRequestsPage(seconds), cancellationToken);
+                }
             };
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                 RateLimitPartition.GetFixedWindowLimiter(context.User.Identity?.Name ?? ClientKey(context), _ => new FixedWindowRateLimiterOptions
@@ -121,12 +129,15 @@ public static class SecurityServiceCollectionExtensions
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 }));
-            options.AddPolicy(RateLimitPolicies.Login, context => RateLimitPartition.GetFixedWindowLimiter(ClientKey(context), _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-            }));
+            // Only credential submissions count (OWASP): viewing the login page is never throttled.
+            options.AddPolicy(RateLimitPolicies.Login, context => HttpMethods.IsPost(context.Request.Method)
+                ? RateLimitPartition.GetFixedWindowLimiter(ClientKey(context), _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                })
+                : RateLimitPartition.GetNoLimiter("login-page"));
             options.AddPolicy(RateLimitPolicies.Ingest, context => RateLimitPartition.GetFixedWindowLimiter(context.User.Identity?.Name ?? ClientKey(context), _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 30,
@@ -183,6 +194,16 @@ public static class SecurityServiceCollectionExtensions
     }
 
     /// <summary>Client address as resolved by the forwarded-headers middleware (Render proxy), or a fixed bucket.</summary>
+    private static string TooManyRequestsPage(int seconds) => $"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Demasiados intentos · vuln-manager</title><link rel="stylesheet" href="/app.css" /></head>
+        <body><main class="content"><section class="card"><h1>Demasiados intentos</h1>
+        <p>Por seguridad limitamos los intentos seguidos. Espera {seconds} segundos y vuelve a intentarlo.</p>
+        <a class="btn" href="/login">Volver al inicio de sesión</a></section></main></body>
+        </html>
+        """;
+
     private static string ClientKey(HttpContext context) =>
         context.Connection.RemoteIpAddress is { } ip && !IPAddress.IsLoopback(ip) ? ip.ToString() : "local";
 }

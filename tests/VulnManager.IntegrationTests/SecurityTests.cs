@@ -100,6 +100,27 @@ public class SecurityTests(PostgresContainer postgres, ExternalApisStub apis) : 
     }
 
     [Fact]
+    public async Task Login_page_views_are_not_throttled_and_blocked_browsers_get_a_page_instead_of_a_redirect_loop()
+    {
+        using var browser = Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        for (var i = 0; i < 15; i++)
+        {
+            (await browser.GetAsync("/login", Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        HttpResponseMessage? last = null;
+        for (var i = 0; i < 12; i++)
+        {
+            last = await browser.PostAsync("/login", new FormUrlEncodedContent([]), Ct);
+        }
+
+        last!.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        last.Headers.Location.Should().BeNull();
+        last.Headers.RetryAfter.Should().NotBeNull();
+        (await last.Content.ReadAsStringAsync(Ct)).Should().Contain("Demasiados intentos");
+    }
+
+    [Fact]
     public async Task Responses_carry_security_headers_and_no_server_banner()
     {
         var response = await Admin.GetAsync("/api/projects", Ct);
