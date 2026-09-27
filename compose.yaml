@@ -34,14 +34,14 @@ services:
       Seed__DemoData: "true"
       Seed__AdminEmail: ${SEED_ADMIN_EMAIL:?Define SEED_ADMIN_EMAIL en .env}
       Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:?Define SEED_ADMIN_PASSWORD en .env}
-      Seed__AnalystEmail: ${SEED_ANALYST_EMAIL}
-      Seed__AnalystPassword: ${SEED_ANALYST_PASSWORD}
-      Seed__ViewerEmail: ${SEED_VIEWER_EMAIL}
-      Seed__ViewerPassword: ${SEED_VIEWER_PASSWORD}
-      Sync__TriggerToken: ${SYNC_TRIGGER_TOKEN}
-      ExternalSources__NvdApiKey: ${NVD_API_KEY}
-      AlertWebhook__Url: ${ALERT_WEBHOOK_URL}
-      Cors__AllowedOrigins: ${CORS_ALLOWED_ORIGINS}
+      Seed__AnalystEmail: ${SEED_ANALYST_EMAIL:-}
+      Seed__AnalystPassword: ${SEED_ANALYST_PASSWORD:-}
+      Seed__ViewerEmail: ${SEED_VIEWER_EMAIL:-}
+      Seed__ViewerPassword: ${SEED_VIEWER_PASSWORD:-}
+      Sync__TriggerToken: ${SYNC_TRIGGER_TOKEN:-}
+      ExternalSources__NvdApiKey: ${NVD_API_KEY:-}
+      AlertWebhook__Url: ${ALERT_WEBHOOK_URL:-}
+      Cors__AllowedOrigins: ${CORS_ALLOWED_ORIGINS:-}
       # Local plain HTTP: browsers drop Secure cookies, so they are relaxed only here.
       Security__SecureCookies: "false"
     read_only: true
