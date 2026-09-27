@@ -27,6 +27,7 @@ jobs:
           dotnet tool restore
           dotnet ef migrations bundle -p src/VulnManager.Infrastructure -s src/VulnManager.Infrastructure --self-contained -r linux-x64 -o efbundle
       - name: Aplicar
+        # DEPLOY_DB_CONNECTION en formato clave=valor (Neon › Connect › .NET); --connection no acepta la URI postgresql://.
         env:
           ASPNETCORE_ENVIRONMENT: Production
           DEPLOY_DB_CONNECTION: ${{ secrets.DEPLOY_DB_CONNECTION }}
