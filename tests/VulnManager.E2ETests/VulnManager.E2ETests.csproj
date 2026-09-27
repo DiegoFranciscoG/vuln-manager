@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />
+    <!-- Accepts the same coverage arguments that CI passes to every test project in the solution. -->
+    <PackageReference Include="coverlet.MTP" />
     <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
