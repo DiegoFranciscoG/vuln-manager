@@ -138,6 +138,24 @@ public class VexAndTriageTests(PostgresContainer postgres, ExternalApisStub apis
     }
 
     [Fact]
+    public async Task Alerts_are_listed_newest_first_and_leave_the_open_list_when_acknowledged()
+    {
+        var project = await ProjectWithLog4jFindingsAsync();
+
+        var open = await ReadAsync<PagedResult<AlertDto>>(await Admin.GetAsync($"/api/alerts?projectId={project.Id}", Ct));
+        open.Items.Should().NotBeEmpty().And.BeInDescendingOrder(a => a.CreatedAt);
+        open.Items.Should().OnlyContain(a => a.ProjectName == project.Name && a.AcknowledgedAt == null);
+        var first = open.Items[0];
+
+        (await Admin.PostAsync($"/api/alerts/{first.Id}/ack", null, Ct)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await ReadAsync<PagedResult<AlertDto>>(await Admin.GetAsync($"/api/alerts?projectId={project.Id}", Ct))).Items
+            .Should().NotContain(a => a.Id == first.Id);
+        (await ReadAsync<PagedResult<AlertDto>>(await Admin.GetAsync($"/api/alerts?projectId={project.Id}&onlyOpen=false", Ct))).Items
+            .Should().ContainSingle(a => a.Id == first.Id && a.AcknowledgedAt != null);
+    }
+
+    [Fact]
     public async Task Non_exhaustive_rule_sets_are_rejected()
     {
         var response = await Admin.PostAsJsonAsync("/api/priority-rules", new CreatePriorityRuleRequest

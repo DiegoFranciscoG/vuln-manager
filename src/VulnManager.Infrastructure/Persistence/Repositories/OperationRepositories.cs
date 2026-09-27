@@ -59,9 +59,14 @@ public sealed class AlertRepository(VulnManagerDbContext db) : IAlertRepository
         var query = from a in db.Alerts.AsNoTracking()
                     join p in db.Projects on a.ProjectId equals p.Id
                     where (projectId == null || a.ProjectId == projectId) && (!onlyOpen || a.AcknowledgedAt == null)
-                    select new AlertDto(a.Id, a.ProjectId, p.Name, a.FindingId, a.Type, a.Message, a.CreatedAt, a.AcknowledgedAt);
+                    select new { Alert = a, ProjectName = p.Name };
         var total = await query.CountAsync(cancellationToken);
-        var items = await query.OrderByDescending(a => a.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+
+        // Sort and page on entity columns before projecting: EF cannot translate an OrderBy over a record constructor.
+        var items = await query.OrderByDescending(x => x.Alert.CreatedAt).ThenByDescending(x => x.Alert.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(x => new AlertDto(x.Alert.Id, x.Alert.ProjectId, x.ProjectName, x.Alert.FindingId, x.Alert.Type, x.Alert.Message, x.Alert.CreatedAt, x.Alert.AcknowledgedAt))
+            .ToListAsync(cancellationToken);
         return new PagedResult<AlertDto>(items, page, pageSize, total);
     }
 
