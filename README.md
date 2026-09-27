@@ -7,7 +7,7 @@ Plataforma que **ingesta SBOM CycloneDX**, cruza cada componente con **OSV.dev**
 ![Blazor](https://img.shields.io/badge/UI-Blazor%20Server-512bd4)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-blue)
-![Demo](https://img.shields.io/badge/demo-Render%20%2B%20Neon%20(pendiente)-lightgrey)
+![Demo](https://img.shields.io/badge/demo-Render%20%2B%20Neon%20%28pendiente%29-lightgrey)
 
 ## Demo en vivo y usuario de prueba
 
@@ -367,7 +367,7 @@ Límites a tener en cuenta:
 | [CISA Vulnrichment](https://github.com/cisagov/vulnrichment) vía [CVE Services](https://www.cve.org) | SSVC: Exploitation, Automatable, Technical Impact | CC0-1.0. CVE® es una marca registrada de The MITRE Corporation, usada bajo los CVE Terms of Use |
 | [FIRST EPSS](https://www.first.org/epss/) | Probabilidad y percentil de explotación | Uso libre con atribución a FIRST |
 | [NIST NVD](https://nvd.nist.gov) | CVSS cuando falta en las demás fuentes | *This product uses data from the NVD API but is not endorsed or certified by the NVD.* |
-| [CISA BOD 26-04](https://www.cisa.gov/directives) | Tabla 1 de plazos de remediación | Documento público del gobierno de EE. UU. |
+| [CISA BOD 26-04](https://www.cisa.gov/news-events/directives/bod-26-04-prioritizing-security-updates-based-risk) | Tabla 1 de plazos de remediación | Documento público del gobierno de EE. UU. |
 
 Los datos de demostración son ficticios; los paquetes de los SBOM demo son públicos. Todas las fuentes, con fecha de consulta y supuestos, están en [docs/investigacion.md](docs/investigacion.md).
 
