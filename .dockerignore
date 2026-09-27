@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+.git/
+.github/
+.env
+.env.*
+artifacts/
+docs/
+tests/
+scripts/
+*.md
+dotnet-tools.json
+compose.yaml
+render.yaml
