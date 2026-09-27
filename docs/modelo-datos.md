@@ -113,9 +113,9 @@ erDiagram
     uuid vulnerability_id FK
     varchar status
     varchar priority_level "P1 a P4"
-    jsonb priority_explanation
+    json priority_explanation
     timestamptz sla_due_at "sla_vencimiento"
-    jsonb sla_explanation
+    json sla_explanation
     bool forensic_triage_required
   }
   FINDING_STATUS_HISTORY {
@@ -324,12 +324,12 @@ El JSON crudo del SBOM **no se guarda**: solo el hash y los componentes extraíd
 | vex_statement_id | uuid | FK → `vex_statements`, NULL; **NOT NULL si status = NOT_AFFECTED** (CHECK) | #33 |
 | priority_level | varchar(2) | NOT NULL, CHECK ∈ {`P1`,`P2`,`P3`,`P4`} | §3.1 |
 | priority_rule_id | uuid | FK → `priority_rules` | Qué versión de la regla se aplicó |
-| priority_explanation | jsonb | NOT NULL | Entradas y regla que coincidió (explicable) |
-| sla_policy | varchar(12) | NOT NULL, CHECK ∈ {`BOD_26_04`,`SEVERITY`} | §3.2 |
+| priority_explanation | json | NOT NULL | Entradas y regla que coincidió (explicable). `json` y no `jsonb`: conserva el texto exacto, así una explicación sin cambios compara igual y no se reescribe (idempotencia) |
+| sla_policy | varchar(12) | NOT NULL, CHECK ∈ {`BOD2604`,`SEVERITY`} | §3.2 |
 | sla_days | int | NULL (NULL = *Fix on system upgrade*) | #13, S7 |
 | sla_started_at | timestamptz | NOT NULL | min(detección, `kev.date_added`) (#13) |
 | sla_due_at | timestamptz | NULL | **"sla_vencimiento"**; el contador se calcula en la consulta |
-| sla_explanation | jsonb | NOT NULL | Fila de la Tabla 1 y origen de cada dato |
+| sla_explanation | json | NOT NULL | Fila de la Tabla 1 y origen de cada dato (`json` por la misma razón) |
 | forensic_triage_required | boolean | NOT NULL, DEFAULT false | Filas 1, 3 y 9 de la BOD 26-04 (#13) |
 | first_detected_at / last_seen_at | timestamptz | NOT NULL | — |
 | resolved_at | timestamptz | NULL | — |
@@ -362,12 +362,12 @@ Solo se inserta una fila si el estado **realmente cambia** (`from ≠ to`). Por 
 | vulnerability_ref | varchar(50) | NOT NULL (CVE o GHSA; se compara con `external_id` y con `aliases`) | Permite declarar VEX antes de sincronizar la vulnerabilidad |
 | component_purl | varchar(1000) | NULL = todos los componentes del proyecto; PURL con versión = coincidencia exacta; PURL sin versión = todas las versiones | *subcomponent_id* (#33) |
 | status | varchar(20) | NOT NULL, CHECK ∈ {`NOT_AFFECTED`,`AFFECTED`,`FIXED`,`UNDER_INVESTIGATION`} | #33 |
-| justification_scheme | varchar(10) | NULL, CHECK ∈ {`CISA`,`CYCLONEDX`} | Se conserva el vocabulario de origen |
+| justification_scheme | varchar(10) | NULL, CHECK ∈ {`CISA`,`CYCLONE_DX`} | Se conserva el vocabulario de origen |
 | justification | varchar(40) | NULL; CHECK: valor válido según su esquema (5 de CISA #33 o 9 de CycloneDX #30) | #30, #33 |
 | impact_statement | varchar(2000) | NULL | #33 |
 | action_statement | varchar(2000) | NULL | #33 |
 | cdx_state / cdx_response | varchar(30) / text[] | NULL (solo en importaciones CycloneDX) | #30 |
-| source | varchar(15) | NOT NULL, CHECK ∈ {`MANUAL`,`CYCLONEDX_VEX`} | — |
+| source | varchar(15) | NOT NULL, CHECK ∈ {`MANUAL`,`CYCLONE_DX_VEX`} | — |
 | source_import_id | uuid | FK → `sbom_imports`, NULL | — |
 | author / created_at | varchar(100) / timestamptz | NOT NULL | "Justificación registrada" |
 | revoked_at / revoked_by | timestamptz / varchar(100) | NULL | Se revoca en lugar de borrar |
@@ -389,7 +389,7 @@ CHECKs derivados de CISA (#33):
 | unknown_severity_as | varchar(4) | NOT NULL, DEFAULT `HIGH`, CHECK ∈ {`HIGH`,`LOW`} | S3 |
 | ssvc_active_counts_as_exploited | boolean | NOT NULL, DEFAULT true | Vulnrichment `Exploitation=active` (#15) |
 | rules | jsonb | NOT NULL; lista ordenada en la que gana la primera coincidencia; se **valida que cubra las 12 combinaciones** | §3.1 |
-| sla_policy | varchar(12) | NOT NULL, DEFAULT `BOD_26_04` | §3.2 |
+| sla_policy | varchar(12) | NOT NULL, DEFAULT `BOD2604` | §3.2 |
 | sla_severity_days | jsonb | NULL (`{"CRITICAL":15,"HIGH":30,"MEDIUM":90,"LOW":180}`) | S4 |
 | fix_on_upgrade_days | int | NULL | S7 |
 | created_by / created_at | varchar(100) / timestamptz | NOT NULL | — |
@@ -415,7 +415,7 @@ CHECKs derivados de CISA (#33):
 | id | uuid | PK | — |
 | source | varchar(10) | NOT NULL, CHECK ∈ {`OSV`,`KEV`,`EPSS`,`CVE`,`NVD`} | — |
 | trigger | varchar(12) | NOT NULL, CHECK ∈ {`SCHEDULED`,`MANUAL`,`SBOM_IMPORT`,`STARTUP`,`EXTERNAL`} | `EXTERNAL` = cron de GitHub Actions (#54, S8) |
-| status | varchar(10) | NOT NULL, CHECK ∈ {`RUNNING`,`SUCCEEDED`,`PARTIAL`,`FAILED`,`SKIPPED`}; **índice único parcial `(source) WHERE status='RUNNING'`** | Evita dos ejecuciones simultáneas (además de `pg_try_advisory_lock`) |
+| status | varchar(10) | NOT NULL, CHECK ∈ {`RUNNING`,`SUCCEEDED`,`PARTIAL`,`FAILED`,`SKIPPED`}; **índice único parcial `(source) WHERE status='RUNNING'`** | Evita dos ejecuciones simultáneas de la misma fuente (además, el worker consume la cola de a una) |
 | started_at / finished_at | timestamptz | NOT NULL / NULL | — |
 | items_requested / items_updated | int | NOT NULL, DEFAULT 0 | Evidencia de idempotencia (la 2.ª corrida → `items_updated = 0`) |
 | http_requests / http_throttled | int | NOT NULL, DEFAULT 0 | Evidencia de que se respeta el límite de cada API |
@@ -434,7 +434,7 @@ CHECKs derivados de CISA (#33):
 | entity_type / entity_id | varchar(50) / varchar(100) | NOT NULL | — |
 | details | jsonb | NULL; **sin secretos ni datos personales** | #58 |
 
-Un **trigger de PostgreSQL** rechaza `UPDATE` y `DELETE` sobre `audit_log` y `finding_status_history`. La única excepción es la purga por retención, que corre con un rol aparte (S9).
+Un **trigger de PostgreSQL** rechaza `UPDATE` y `DELETE` sobre `audit_log` y `finding_status_history`. La única excepción es la purga por retención (S9): corre en su propia transacción y activa `SET LOCAL vulnmanager.allow_retention_purge = 'on'`, que el trigger comprueba. Así funciona también en Neon free, donde no hay un rol aparte para tareas de mantenimiento.
 
 ### 2.15 Identity (ASP.NET Core Identity)
 
@@ -442,6 +442,10 @@ Tablas estándar de Identity (usuarios, roles, claims, logins, tokens) con nombr
 - **Roles**: `Admin` (todo, incluidas reglas, usuarios y claves), `Analyst` (importa SBOM, cambia estados, gestiona VEX) y `Viewer` (solo lectura y exportación CSV).
 - **Datos personales**: solo el email para iniciar sesión. Sin nombres ni teléfonos (#58).
 - **Contraseñas**: `IPasswordHasher` propio con **Argon2id**, m = 19 MiB, t = 2, p = 1 (#46).
+
+### 2.16 `data_protection_keys`
+
+Claves de ASP.NET Core Data Protection guardadas en la base de datos (`id`, `friendly_name`, `xml`). Así las cookies de sesión y los tokens antiforgery siguen siendo válidos tras reinicios y despliegues. Render free no tiene disco persistente y cada despliegue arranca un contenedor nuevo.
 
 ## 3. Reglas de negocio
 
@@ -498,7 +502,7 @@ Así el parche disponible entra en la función de prioridad **sin multiplicar ma
 }
 ```
 
-### 3.2 SLA: Tabla 1 de la BOD 26-04 (política por defecto `BOD_26_04`)
+### 3.2 SLA: Tabla 1 de la BOD 26-04 (política por defecto `BOD2604`)
 
 Entradas:
 - *Publicly exposed* = `projects.exposure = PUBLIC`
@@ -576,12 +580,12 @@ Cualquier otra transición se rechaza con 409. `Viewer` no puede cambiar estados
 | Subir el mismo SBOM dos veces | UNIQUE(`project_id`, `sha256`): devuelve **200** con la importación existente, sin crear hallazgos ni historial |
 | Cruce componente ↔ vulnerabilidad | PK compuesta + *upsert* |
 | Vulnerabilidad | UNIQUE(`external_id`); solo se actualiza si cambió `modified` |
-| KEV | GET condicional (`If-None-Match` / ETag); `304` → `SKIPPED`; *upsert* por `cve_id` |
+| KEV | GET condicional (`If-None-Match` + `If-Modified-Since`: el CDN de CISA solo respeta el segundo); `304` → `SKIPPED`; *upsert* por `cve_id` |
 | EPSS | Se omite el CVE si `epss_date` = fecha de puntuación vigente |
 | Hallazgo | UNIQUE(`project_id`, `component_id`, `vulnerability_id`) |
 | Historial | Se inserta solo si el estado cambia |
 | Alertas | UNIQUE(`dedup_key`) |
-| Ejecuciones de sincronización | Índice único parcial `RUNNING` por fuente + `pg_try_advisory_lock` |
+| Ejecuciones de sincronización | Índice único parcial `ux_sync_runs_single_running` (`status = 'RUNNING'`) + un único consumidor (`Channel` acotado) en el `BackgroundService` |
 
 Prueba de aceptación: correr dos veces seguidas la sincronización contra *fixtures* de WireMock. La segunda corrida debe dejar `items_updated = 0` y el mismo número de filas y hashes de contenido en todas las tablas.
 
@@ -591,7 +595,7 @@ Prueba de aceptación: correr dos veces seguidas la sincronización contra *fixt
 |---|---|---|
 | NVD sin clave | ventana móvil de 5 peticiones por 30 s + ≥ 6 s entre peticiones | #1 |
 | NVD con clave (`NVD_API_KEY`) | 50 peticiones por 30 s + ≥ 6 s entre peticiones (recomendación) | #1 |
-| OSV | sin límite documentado; lotes de 100 y concurrencia 2 (buena ciudadanía) | #4, S5 |
+| OSV | sin límite documentado; `querybatch` en lotes configurables (100 por defecto) y hasta 4 consultas de detalle en paralelo | #4, S5 |
 | EPSS | ≤ 100 CVE por petición (tope de 2 000 caracteres); 1 corrida al día después de 13:30 UTC | #23, #26 |
 | KEV | 1 GET condicional cada 6 h | #12 |
 | CVE Services | ≤ 60 peticiones por minuto (muy por debajo de 25 000/60 s) | #16 |
@@ -616,9 +620,9 @@ Todas respetan `Retry-After` (#41) y reintentan 3 veces con backoff exponencial 
 - **Migraciones**: EF Core, versionadas en `src/VulnManager.Infrastructure/Persistence/Migrations`.
   - La primera, `InitialSchema`, incluye los CHECK, los índices parciales y el trigger de solo-inserción mediante `migrationBuilder.Sql`.
   - En CI corre `dotnet ef migrations has-pending-model-changes`.
-  - En producción se aplican con un **migration bundle** desde GitHub Actions contra Neon, con una identidad de despliegue distinta a la de la app (#39).
+  - En producción hay dos opciones. La recomendada es el workflow manual `migrate.yml`: genera un **migration bundle** y lo aplica contra Neon con una identidad de despliegue distinta a la de la app (#39). En Render free, el Blueprint activa `Database__ApplyMigrationsOnStartup` para que la demo arranque sola.
   - Nunca se usa `EnsureCreated`.
-- **Seeds (ficticios)**. Se cargan con `UseAsyncSeeding` y son idempotentes:
+- **Seeds (ficticios)**. Los carga `DemoDataSeeder` al arrancar si `Seed__DemoData=true`. Son idempotentes: si un proyecto ya existe, se omite.
   - Regla de prioridad v1 activa (§3.1).
   - Tres proyectos de demostración: `portal-ciudadano-demo` (PUBLIC/PRODUCTION), `api-pagos-demo` (PUBLIC/PRODUCTION) y `backoffice-rrhh-demo` (INTERNAL/PRODUCTION).
   - SBOM CycloneDX de ejemplo con **paquetes públicos reales** y vulnerabilidades conocidas: `log4j-core 2.14.1` (CVE-2021-44228, KEV), `spring-beans 5.3.17` (CVE-2022-22965, KEV), `lodash 4.17.15`, `Newtonsoft.Json 12.0.1`, etc.
