@@ -373,6 +373,6 @@ Los datos de demostración son ficticios; los paquetes de los SBOM demo son púb
 
 ## Autor
 
-Diego Francisco Granda Zhingre — [GitHub](https://github.com/DiegoFranciscoG)
+Diego Francisco Granda Zhingre — [GitHub](https://github.com/DiegoFranciscoG) · [LinkedIn](https://www.linkedin.com/in/diego-francisco-g-61b793254/) · [Portafolio](https://diegofranciscog.github.io/)
 
 Licencia [MIT](LICENSE).
