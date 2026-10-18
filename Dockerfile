@@ -14,7 +14,7 @@ RUN dotnet publish src/VulnManager.Web/VulnManager.Web.csproj -c Release -o /app
 
 # 2) Runtime: ASP.NET Core 10.0.12 on Ubuntu Noble "chiseled" (distroless: no shell, no package manager,
 #    non-root "app" user). The "-extra" variant keeps ICU and tzdata for Spanish formatting.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble-chiseled-extra
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13-noble-chiseled-extra
 WORKDIR /app
 COPY --from=build /app .
 ENV ASPNETCORE_HTTP_PORTS=8080 \
