@@ -1,7 +1,7 @@
 # Multi-stage build. Every image is pinned to an exact version (never "latest").
 
 # 1) Build and publish with the .NET 10 SDK.
-FROM mcr.microsoft.com/dotnet/sdk:10.0.401-noble AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.402-noble AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/VulnManager.Domain/VulnManager.Domain.csproj src/VulnManager.Domain/
